@@ -20,6 +20,7 @@ from butler.debug_dashboard.server import (
     DebugHTTPServer,
     _normalize_remote_host,
     build_audio_snapshot,
+    build_latency_summary,
     build_request_traces,
     build_tool_reliability,
     read_conversation_messages,
@@ -88,6 +89,24 @@ class DebugDashboardDataTests(unittest.TestCase):
         self.assertEqual(result["rows"][0]["transcript"], "Butler turn on the light")
         self.assertEqual(result["rows"][0]["input_rms"], 418.5)
 
+    def test_hex_session_ids_stay_text_and_snapshot_is_strict_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            path = root / "voice_benchmarks_run.csv"
+            with path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["session_id", "input_rms", "odd_metric"])
+                writer.writeheader()
+                writer.writerow({"session_id": "2e365266", "input_rms": "1.5", "odd_metric": "9e999"})
+                writer.writerow({"session_id": "39181e28", "input_rms": "2", "odd_metric": "nan"})
+
+            result = read_voice_benchmarks(root, limit=10)
+
+        session_ids = {row["session_id"] for row in result["rows"]}
+        self.assertEqual(session_ids, {"2e365266", "39181e28"})
+        self.assertEqual({row["odd_metric"] for row in result["rows"]}, {"9e999", "nan"})
+        # Browsers reject NaN/Infinity, which blanked the whole dashboard.
+        json.dumps(result, allow_nan=False)
+
     def test_reads_current_single_rolling_voice_benchmark_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -130,7 +149,7 @@ class DebugDashboardDataTests(unittest.TestCase):
                     "timestamp": "2026-08-10T00:00:02Z",
                     "event": "barge_in_metrics_snapshot",
                     "counters": {"accepted": 1},
-                    "measurements": {"capture_rms_last": 900, "capture_rms_average": 450},
+                    "measurements": {"capture_rms_count": 2, "capture_rms_last": 900, "capture_rms_average": 450},
                 }
             ]
         }
@@ -148,6 +167,52 @@ class DebugDashboardDataTests(unittest.TestCase):
         self.assertEqual(result["status"], "available")
         self.assertEqual(result["series"]["input_rms"][0]["value"], 300)
         self.assertEqual(result["series"]["capture_rms"][0]["value"], 900)
+        self.assertIsNone(result["latest_aec_status"])
+
+    def test_audio_series_plot_only_new_barge_in_measurements(self) -> None:
+        def snapshot(timestamp, pid, count, total, last):
+            return {
+                "timestamp": timestamp,
+                "pid": pid,
+                "event": "barge_in_metrics_snapshot",
+                "measurements": {
+                    "pause_latency_ms_count": count,
+                    "pause_latency_ms_total": total,
+                    "pause_latency_ms_last": last,
+                },
+            }
+
+        # Newest first, as the telemetry reader returns them.
+        telemetry = {"events": [
+            snapshot("2026-10-18T00:00:05Z", 2, 1, 90.0, 90.0),     # worker restarted
+            snapshot("2026-10-18T00:00:04Z", 1, 3, 600.0, 300.0),   # two new: 200 and 300
+            snapshot("2026-10-18T00:00:03Z", 1, 1, 100.0, 100.0),   # nothing new since :02
+            snapshot("2026-10-18T00:00:02Z", 1, 1, 100.0, 100.0),
+        ]}
+
+        result = build_audio_snapshot(telemetry, {"rows": []})
+
+        self.assertEqual(
+            [(point["timestamp"][-3:-1], point["value"]) for point in result["series"]["pause_latency_ms"]],
+            [("02", 100.0), ("04", 250.0), ("05", 90.0)],
+        )
+
+    def test_audio_snapshot_surfaces_latest_aec_startup_outcome(self) -> None:
+        telemetry = {
+            "events": [
+                {"event": "barge_in_metrics_snapshot", "counters": {}},
+                {
+                    "timestamp": "2026-10-18T00:00:02Z",
+                    "event": "aec_barge_in_unavailable",
+                    "error": "Pinned Windows audio endpoint identity does not match",
+                },
+                {"timestamp": "2026-10-17T00:00:00Z", "event": "aec_barge_in_started"},
+            ]
+        }
+
+        result = build_audio_snapshot(telemetry, {"rows": []})
+
+        self.assertEqual(result["latest_aec_status"]["event"], "aec_barge_in_unavailable")
 
     def test_snapshot_schema_keeps_unavailable_prompt_capture_truthful(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -282,6 +347,28 @@ class DebugDashboardDataTests(unittest.TestCase):
         self.assertEqual(tools[0]["tool_name"], "water")
         self.assertEqual(tools[0]["failures"], 1)
         self.assertEqual(tools[0]["success_rate_percent"], 50.0)
+
+    def test_traces_skip_background_ids_and_time_response_apart_from_speech(self) -> None:
+        events = [
+            # Warm-ups and session-level events, minutes apart: not requests.
+            {"timestamp": "2026-08-10T00:00:00Z", "request_id": "llm-preramp", "event": "llm_preramp"},
+            {"timestamp": "2026-08-10T00:15:00Z", "request_id": "llm-preramp", "event": "llm_preramp"},
+            {"timestamp": "2026-08-10T00:01:00Z", "request_id": "voice-worker", "session_id": "voice-worker", "event": "aec_barge_in_started"},
+            {"timestamp": "2026-08-10T00:09:00Z", "request_id": "voice-worker", "session_id": "voice-worker", "event": "aec_barge_in_started"},
+            {"timestamp": "2026-08-10T00:02:00Z", "event": "orphan"},
+            # A voice turn: reply ready after 1.5 s, then ~16 s of speech.
+            {"timestamp": "2026-08-10T00:05:00.000Z", "request_id": "abc123", "session_id": "voice-worker", "event": "stt_completed"},
+            {"timestamp": "2026-08-10T00:05:01.500Z", "request_id": "abc123", "session_id": "voice-worker", "event": "text_stream_completed"},
+            {"timestamp": "2026-08-10T00:05:17.700Z", "request_id": "abc123", "session_id": "voice-worker", "event": "voice_pipeline_completed"},
+        ]
+
+        traces = build_request_traces(events)
+        summary = build_latency_summary(traces)
+
+        self.assertEqual([trace["trace_id"] for trace in traces], ["abc123"])
+        self.assertEqual(traces[0]["response_ms"], 1500.0)
+        self.assertEqual(traces[0]["elapsed_ms"], 17700.0)
+        self.assertEqual(summary["max_ms"], 1500.0)
 
     def test_reads_jobs_without_exposing_request_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

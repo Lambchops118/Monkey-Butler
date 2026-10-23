@@ -52,6 +52,217 @@ class WindowsAecEvidence:
     reference_mode: str
 
 
+@dataclass(frozen=True)
+class WindowsAudioEndpointInfo:
+    endpoint_id: str
+    flow: str
+    friendly_name: str
+    active: bool
+
+
+EndpointDescriber = Callable[[str], "WindowsAudioEndpointInfo | None"]
+ActiveNameCounter = Callable[[str, str], int]
+
+_MMDEVICE_ROOT = r"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio"
+_FLOW_KEYS = {"capture": "Capture", "render": "Render"}
+_FLOW_PREFIXES = {"{0.0.1.00000000}": "capture", "{0.0.0.00000000}": "render"}
+_PKEY_DEVICE_DESCRIPTION = "{a45c254e-df1c-4efd-8020-67d146a850e0},2"
+_PKEY_INTERFACE_FRIENDLY_NAME = "{b3f8fa53-0004-438e-9003-51a46e139bfc},6"
+_DEVICE_STATE_ACTIVE = 0x1
+
+
+def parse_mmdevice_endpoint_id(endpoint_id: str) -> tuple[str, str] | None:
+    """Split a WinRT endpoint ID into (flow, endpoint GUID), or None."""
+    parts = str(endpoint_id or "").split("#")
+    if len(parts) < 3:
+        return None
+    prefix, brace_dot, guid = parts[2].partition("}.")
+    flow = _FLOW_PREFIXES.get(prefix + "}")
+    if flow is None or not brace_dot or not guid.startswith("{"):
+        return None
+    return flow, guid
+
+
+def describe_windows_audio_endpoint(endpoint_id: str) -> WindowsAudioEndpointInfo | None:
+    """Read an endpoint's flow, friendly name and state from MMDevices.
+
+    The friendly name follows Windows' own "Description (Interface)" form, e.g.
+    "Echo Cancelling Speakerphone (reSpeaker XVF3800 4-Mic Array)". Returns None
+    when the ID is malformed or Windows no longer knows the endpoint.
+    """
+    parsed = parse_mmdevice_endpoint_id(endpoint_id)
+    if parsed is None:
+        return None
+    flow, guid = parsed
+    try:
+        import winreg
+    except ImportError:  # pragma: no cover - platform guard
+        return None
+    key_path = rf"{_MMDEVICE_ROOT}\{_FLOW_KEYS[flow]}\{guid}"
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
+            state, _ = winreg.QueryValueEx(key, "DeviceState")
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE, key_path + r"\Properties"
+        ) as properties:
+            description = _read_string(winreg, properties, _PKEY_DEVICE_DESCRIPTION)
+            interface = _read_string(winreg, properties, _PKEY_INTERFACE_FRIENDLY_NAME)
+    except OSError:
+        return None
+    name = f"{description} ({interface})" if interface else description
+    return WindowsAudioEndpointInfo(
+        endpoint_id=endpoint_id,
+        flow=flow,
+        friendly_name=name,
+        active=int(state) == _DEVICE_STATE_ACTIVE,
+    )
+
+
+def count_active_windows_audio_endpoints_named(flow: str, friendly_name: str) -> int:
+    """Count active endpoints of one flow whose friendly name matches."""
+    try:
+        import winreg
+    except ImportError:  # pragma: no cover - platform guard
+        return 0
+    wanted = friendly_name.strip().casefold()
+    prefix = next(p for p, f in _FLOW_PREFIXES.items() if f == flow)
+    count = 0
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE, rf"{_MMDEVICE_ROOT}\{_FLOW_KEYS[flow]}"
+        ) as root:
+            index = 0
+            while True:
+                try:
+                    guid = winreg.EnumKey(root, index)
+                except OSError:
+                    break
+                index += 1
+                info = describe_windows_audio_endpoint(
+                    rf"\\?\SWD#MMDEVAPI#{prefix}.{guid}#"
+                )
+                if info and info.active and info.friendly_name.casefold() == wanted:
+                    count += 1
+    except OSError:
+        return 0
+    return count
+
+
+def _read_string(winreg, key, name: str) -> str:
+    try:
+        value, _ = winreg.QueryValueEx(key, name)
+    except OSError:
+        return ""
+    return str(value or "").strip()
+
+
+class EndpointPinMismatch(RuntimeError):
+    """The pinned endpoints are not the current defaults and cannot be followed."""
+
+    def __init__(self, message: str, details: dict[str, object]) -> None:
+        super().__init__(message)
+        self.details = details
+
+
+@dataclass(frozen=True)
+class EndpointResolution:
+    endpoints: WindowsAudioEndpoints
+    capture: str
+    render: str
+    details: dict[str, object]
+
+    @property
+    def reenumerated(self) -> bool:
+        return "reenumerated" in (self.capture, self.render)
+
+
+def resolve_pinned_windows_audio_endpoints(
+    pinned: WindowsAudioEndpoints,
+    defaults: WindowsAudioEndpoints,
+    *,
+    capture_name: str = "",
+    render_name: str = "",
+    describe: EndpointDescriber = describe_windows_audio_endpoint,
+    count_active_named: ActiveNameCounter = count_active_windows_audio_endpoints_named,
+) -> EndpointResolution:
+    """Accept the pinned pair, or follow a re-enumeration of the same devices.
+
+    Windows can re-register an unchanged physical device under a new MMDevice
+    ID. A side whose pin no longer matches the default is followed only when a
+    pinned friendly name is configured for it, the old pinned endpoint is no
+    longer active, the new default is active and carries exactly that name, and
+    no other active endpoint of the same flow does. Anything else, including
+    the owner choosing a different default device, still fails closed. The AEC
+    effect itself is verified separately by ``query_windows_aec``.
+    """
+    details: dict[str, object] = {}
+    failures: list[str] = []
+    outcomes: dict[str, str] = {}
+    resolved: dict[str, str] = {}
+    for flow, pinned_id, default_id, expected in (
+        ("capture", pinned.capture_id, defaults.capture_id, capture_name),
+        ("render", pinned.render_id, defaults.render_id, render_name),
+    ):
+        details[f"{flow}_pinned_id"] = pinned_id
+        details[f"{flow}_default_id"] = default_id
+        if pinned_id == default_id:
+            outcomes[flow] = "pinned"
+            resolved[flow] = pinned_id
+            continue
+        reason = _reenumeration_refusal(
+            flow, pinned_id, default_id, expected.strip(), describe,
+            count_active_named, details,
+        )
+        details[f"{flow}_resolution"] = reason or "reenumerated"
+        if reason:
+            failures.append(f"{flow}: {reason}")
+            continue
+        outcomes[flow] = "reenumerated"
+        resolved[flow] = default_id
+    if failures:
+        raise EndpointPinMismatch(
+            "Pinned Windows audio endpoint identity does not match the current "
+            "default capture/render pair (" + "; ".join(failures) + ").",
+            details,
+        )
+    details.setdefault("capture_resolution", outcomes["capture"])
+    details.setdefault("render_resolution", outcomes["render"])
+    return EndpointResolution(
+        endpoints=WindowsAudioEndpoints(
+            capture_id=resolved["capture"], render_id=resolved["render"]
+        ),
+        capture=outcomes["capture"],
+        render=outcomes["render"],
+        details=details,
+    )
+
+
+def _reenumeration_refusal(
+    flow: str,
+    pinned_id: str,
+    default_id: str,
+    expected: str,
+    describe: EndpointDescriber,
+    count_active_named: ActiveNameCounter,
+    details: dict[str, object],
+) -> str | None:
+    default_info = describe(default_id)
+    details[f"{flow}_default_name"] = default_info.friendly_name if default_info else None
+    if not expected:
+        return "pin differs from default and no pinned endpoint name is configured"
+    details[f"{flow}_pinned_name"] = expected
+    pinned_info = describe(pinned_id)
+    if pinned_info is not None and pinned_info.active:
+        return "pinned endpoint is still active; the default device was changed"
+    if default_info is None or not default_info.active or default_info.flow != flow:
+        return "current default endpoint is not an active endpoint of this flow"
+    if default_info.friendly_name.casefold() != expected.casefold():
+        return "current default endpoint name differs from the pinned name"
+    if count_active_named(flow, default_info.friendly_name) != 1:
+        return "pinned name is not unique among active endpoints"
+    return None
+
+
 def get_default_windows_audio_endpoints() -> WindowsAudioEndpoints:
     """Return the full MMDevice IDs used by WinRT, not unstable PyAudio indexes."""
     try:

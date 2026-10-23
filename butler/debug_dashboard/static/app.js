@@ -286,15 +286,15 @@ function renderOperations(snapshot) {
   const failures = traces.filter((trace) => trace.outcome !== "completed").length;
   const latency = operations.latency_summary || {};
   const summary = byId("operations-summary");
-  summary.textContent = `${traces.length} trace(s), ${failures} failed/interrupted | latency p50 ${number(latency.p50_ms)} ms / p95 ${number(latency.p95_ms)} ms | jobs: ${jobs.status} | awareness: ${awareness.status} | actions: ${actionFeed.status}`;
+  summary.textContent = `${traces.length} trace(s), ${failures} failed/interrupted | response p50 ${number(latency.p50_ms)} ms / p95 ${number(latency.p95_ms)} ms | jobs: ${jobs.status} | awareness: ${awareness.status} | actions: ${actionFeed.status}`;
   summary.className = `status-strip ${failures || awareness.status !== "available" ? "degraded" : ""}`;
 
   const traceRows = traces.filter((trace) => matchesFilter(trace.trace_id, trace.outcome, trace.components, trace.stages)).map((trace, index) => [
-    cell(shortTime(trace.started_at), "nowrap"), cell(trace.trace_id, "nowrap"), cell(trace.session_id, "nowrap"), badge(trace.outcome), cell(`${number(trace.elapsed_ms)} ms`, "nowrap"),
+    cell(shortTime(trace.started_at), "nowrap"), cell(trace.trace_id, "nowrap"), cell(trace.session_id, "nowrap"), badge(trace.outcome), cell(trace.response_ms == null ? "--" : `${number(trace.response_ms)} ms`, "nowrap"), cell(`${number(trace.elapsed_ms)} ms`, "nowrap"),
     cell(trace.components.join(" → "), "wrap"), durationCell(trace.stages),
     detailsCell("stages", trace.stages, eventKey("trace", trace, index)),
   ]);
-  renderTable(byId("trace-table"), ["START", "TRACE", "SESSION", "OUTCOME", "ELAPSED", "COMPONENTS", "TIMED STAGES", "DETAIL"], traceRows, "No correlated pipeline events available.");
+  renderTable(byId("trace-table"), ["START", "TRACE", "SESSION", "OUTCOME", "RESPONSE", "TOTAL (INCL. SPEECH)", "COMPONENTS", "TIMED STAGES", "DETAIL"], traceRows, "No correlated pipeline events available.");
 
   const toolRows = (operations.tool_reliability || []).map((tool) => [
     cell(tool.tool_name), cell(tool.transport), cell(tool.calls), cell(tool.failures),
@@ -436,6 +436,17 @@ function renderAudio(snapshot) {
   summary.textContent = `${audio.status.toUpperCase()} | source: ${audio.source} | ${audio.sample_semantics}`;
   summary.className = `status-strip ${audio.status === "available" ? "" : "degraded"}`;
   const kpis = byId("audio-kpis"); clear(kpis);
+  const aec = audio.latest_aec_status;
+  if (aec) {
+    const started = aec.event === "aec_barge_in_started";
+    const ends = aec.endpoints || {};
+    const followed = ends.capture_resolution === "reenumerated" || ends.render_resolution === "reenumerated";
+    const state = started ? (followed ? "ON (NEW ID)" : "ON") : "OFF";
+    const note = started
+      ? (followed ? `followed re-enumerated endpoint; update settings.env | ${shortTime(aec.timestamp)}` : shortTime(aec.timestamp))
+      : `${aec.error || "unavailable"} | ${shortTime(aec.timestamp)}`;
+    kpis.appendChild(kpi("AEC barge-in", state, note));
+  }
   Object.entries(audio.configured_thresholds || {}).forEach(([name, value]) => kpis.appendChild(kpi(prettyMetric(name), number(value, 0), "configured/default RMS")));
   Object.entries(audio.series || {}).slice(0, 6).forEach(([name, values]) => {
     const point = latestPoint(values);

@@ -15,14 +15,56 @@ import threading
 import time
 from typing import Callable, Optional
 
-from .config import REPO_ROOT, venv_python, venv_setup_hint
+from .config import REPO_ROOT, get_active_setting, get_setting, venv_python, venv_setup_hint
 
 LogFn = Callable[[str, str], None]
 
+# The launcher always probes and opens the console over loopback; what other
+# machines can reach is decided by the bind address in settings.env.
 DASHBOARD_HOST = "127.0.0.1"
 DASHBOARD_PORT = 8787
 DASHBOARD_URL = f"http://{DASHBOARD_HOST}:{DASHBOARD_PORT}"
 STARTUP_TIMEOUT_SECONDS = 15.0
+_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+_ALL_INTERFACES = "0.0.0.0"
+
+
+def _bind_host() -> str:
+    return get_setting("BUTLER_DEBUG_DASHBOARD_HOST", DASHBOARD_HOST).strip() or DASHBOARD_HOST
+
+
+def _local_host(bind_host: str) -> str:
+    """Address this machine uses to reach a console bound to ``bind_host``."""
+    if bind_host in _LOOPBACK_HOSTS or bind_host == _ALL_INTERFACES:
+        return DASHBOARD_HOST
+    return bind_host
+
+
+def _primary_lan_ip() -> str | None:
+    # Connecting a UDP socket sends nothing; it only asks the OS which local
+    # address the default route would use.
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("10.255.255.255", 1))
+            address = sock.getsockname()[0]
+    except OSError:
+        return None
+    return None if address.startswith(("127.", "0.")) else address
+
+
+def network_urls(bind_host: str | None = None) -> list[str]:
+    """URLs other machines can use, best first: the vanity link, then the LAN address."""
+    bind_host = _bind_host() if bind_host is None else bind_host
+    if bind_host in _LOOPBACK_HOSTS:
+        return []
+    urls: list[str] = []
+    link = get_active_setting("BUTLER_DEBUG_DASHBOARD_LINK")
+    if link:
+        urls.append(link)
+    address = _primary_lan_ip() if bind_host == _ALL_INTERFACES else bind_host
+    if address:
+        urls.append(f"http://{address}:{DASHBOARD_PORT}")
+    return urls
 
 
 def _port_open(host: str, port: int, timeout: float = 0.5) -> bool:
@@ -46,11 +88,15 @@ class DashboardProcess:
 
         Raises ``RuntimeError`` with an operator-readable reason otherwise.
         """
+        bind_host = _bind_host()
+        local_host = _local_host(bind_host)
+        url = f"http://{local_host}:{DASHBOARD_PORT}"
         with self._lock:
-            if _port_open(DASHBOARD_HOST, DASHBOARD_PORT):
-                return DASHBOARD_URL
+            if _port_open(local_host, DASHBOARD_PORT):
+                self._log_network_urls(bind_host)
+                return url
             if self._popen is None or self._popen.poll() is not None:
-                self._popen = self._spawn()
+                self._popen = self._spawn(bind_host)
             popen = self._popen
         deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
         while time.monotonic() < deadline:
@@ -58,19 +104,47 @@ class DashboardProcess:
                 raise RuntimeError(
                     f"debug console exited with code {popen.returncode}; see the Logs tab"
                 )
-            if _port_open(DASHBOARD_HOST, DASHBOARD_PORT):
-                return DASHBOARD_URL
+            if _port_open(local_host, DASHBOARD_PORT):
+                self._log_network_urls(bind_host)
+                return url
             time.sleep(0.2)
         raise RuntimeError(
-            f"debug console did not open {DASHBOARD_URL} within {int(STARTUP_TIMEOUT_SECONDS)}s"
+            f"debug console did not open {url} within {int(STARTUP_TIMEOUT_SECONDS)}s"
         )
 
-    def _spawn(self) -> subprocess.Popen:
+    def start_if_shared(self) -> bool:
+        """Start the console in the background when it is bound beyond loopback.
+
+        Other devices can't press the launcher's button, so a network-shared
+        console has to be up as soon as the launcher is. Returns whether a
+        start was attempted.
+        """
+        if _bind_host() in _LOOPBACK_HOSTS:
+            return False
+
+        def worker() -> None:
+            try:
+                self.ensure_running()
+            except RuntimeError as exc:
+                self._log("dashboard", f"network start failed: {exc}")
+
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    def _log_network_urls(self, bind_host: str) -> None:
+        for network_url in network_urls(bind_host):
+            self._log("dashboard", f"on your network: {network_url}")
+
+    def _spawn(self, bind_host: str) -> subprocess.Popen:
         python = venv_python("main")
         args = [
             str(python), "-m", "butler.debug_dashboard",
-            "--host", DASHBOARD_HOST, "--port", str(DASHBOARD_PORT),
+            "--host", bind_host, "--port", str(DASHBOARD_PORT),
         ]
+        if bind_host not in _LOOPBACK_HOSTS:
+            # The server refuses a network bind without this acknowledgement;
+            # choosing a non-loopback host in settings.env is that choice.
+            args.append("--allow-remote")
         self._log("dashboard", f"starting debug console: {' '.join(args)}")
         env = dict(os.environ)
         env["BUTLER_PROCESS_NAME"] = "dashboard"

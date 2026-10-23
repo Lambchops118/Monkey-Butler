@@ -79,6 +79,7 @@ class LauncherGUI:
         self._load_into_widgets()
         self.root.after(100, self._drain_log_queue)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.dashboard.start_if_shared()
 
     # -- layout ------------------------------------------------------------
 

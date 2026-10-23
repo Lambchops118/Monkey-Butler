@@ -111,6 +111,26 @@ class BargeInVadGateTests(unittest.TestCase):
         self.assertEqual(len(utterances), 1)
         self.assertGreaterEqual(utterances[0][1]["speech_ms"], 96)
 
+    def test_candidate_reports_measured_pause_latency(self):
+        probabilities = iter([0.9, 0.9, 0.9])
+        latencies = []
+        gate = None
+
+        def on_candidate(_probability):
+            latencies.append(gate.last_candidate_latency_ms)
+
+        gate = BargeInVadGate(
+            lambda _: next(probabilities),
+            lambda pcm, evidence: None,
+            on_candidate=on_candidate,
+            config=VadGateConfig(start_frames=3),
+        )
+        for _ in range(3):
+            gate.observe(b"\x01\x00" * 512)
+        self.assertEqual(len(latencies), 1)
+        # At least the onset frame's duration; never the old 0 ms placeholder.
+        self.assertGreaterEqual(latencies[0], gate._frame_ms)
+
     def test_short_transient_never_reaches_asr(self):
         probabilities = iter([0.9, 0.1, 0.1, 0.1])
         utterances = []

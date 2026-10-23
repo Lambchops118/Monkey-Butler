@@ -314,8 +314,12 @@ class BargeInDetector:
             asr_confidence=asr_confidence,
         )
 
-    def record_vad_candidate(self, probability: float) -> None:
-        self._metrics.vad_candidate_started(probability=probability)
+    def record_vad_candidate(
+        self, probability: float, *, pause_latency_ms: float | None = None
+    ) -> None:
+        self._metrics.vad_candidate_started(
+            probability=probability, pause_latency_ms=pause_latency_ms
+        )
 
     def record_vad_capture(self, evidence: dict[str, float]) -> None:
         self._metrics.vad_capture_completed(

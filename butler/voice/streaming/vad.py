@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Callable
@@ -99,10 +100,14 @@ class BargeInVadGate:
         self._capture: list[bytes] = []
         self._hot: list[bytes] = []
         self._hot_probabilities: list[float] = []
+        self._hot_started_at: float | None = None
         self._silence_ms = 0.0
         self._speech_ms = 0.0
         self._total_ms = 0.0
         self._probabilities: list[float] = []
+        # Wall-clock time from the first triggering frame to ``on_candidate``,
+        # read by the candidate callback (which ducks playback) as pause latency.
+        self.last_candidate_latency_ms: float | None = None
 
     def reset(self, *, preserve_preroll: bool = False) -> None:
         """Clear detection state, optionally keeping the buffered lead-in.
@@ -126,6 +131,7 @@ class BargeInVadGate:
             self._capture.clear()
             self._hot.clear()
             self._hot_probabilities.clear()
+            self._hot_started_at = None
             self._silence_ms = 0.0
             self._speech_ms = 0.0
             self._total_ms = 0.0
@@ -181,15 +187,19 @@ class BargeInVadGate:
         completed = None
         evidence = None
         candidate_probability = None
+        hot_started_at: float | None = None
         with self._lock:
             if not self._active:
                 self._push_preroll(frame)
                 if probability >= self.config.start_probability:
+                    if not self._hot:
+                        self._hot_started_at = time.monotonic()
                     self._hot.append(frame)
                     self._hot_probabilities.append(probability)
                 else:
                     self._hot.clear()
                     self._hot_probabilities.clear()
+                    self._hot_started_at = None
                 if len(self._hot) < self.config.start_frames:
                     return
                 self._active = True
@@ -201,8 +211,10 @@ class BargeInVadGate:
                 self._probabilities = list(self._hot_probabilities)
                 self._silence_ms = 0.0
                 candidate_probability = max(self._hot_probabilities)
+                hot_started_at = self._hot_started_at
                 self._hot.clear()
                 self._hot_probabilities.clear()
+                self._hot_started_at = None
             else:
                 self._capture.append(frame)
                 self._total_ms += self._frame_ms
@@ -243,8 +255,15 @@ class BargeInVadGate:
                     self._preroll_ms = 0.0
                     for captured_frame in capture_tail:
                         self._push_preroll(captured_frame)
-        if candidate_probability is not None and self._on_candidate is not None:
-            self._on_candidate(candidate_probability)
+        if candidate_probability is not None:
+            # Same definition as the RMS detector's pause latency: onset of the
+            # first hot frame (one frame before it was observed) to the duck.
+            started = time.monotonic() if hot_started_at is None else hot_started_at
+            self.last_candidate_latency_ms = round(
+                max(0.0, time.monotonic() - started) * 1000.0 + self._frame_ms, 1
+            )
+            if self._on_candidate is not None:
+                self._on_candidate(candidate_probability)
         if completed is not None and evidence is not None:
             self._on_utterance(completed, evidence)
 

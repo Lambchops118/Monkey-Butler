@@ -13,6 +13,7 @@ import concurrent.futures
 import ctypes
 import io
 import json
+import math
 import os
 import shutil
 import socket
@@ -77,7 +78,10 @@ def _json_value(value: str | None) -> Any:
         return lowered == "true"
     try:
         if any(character in value for character in ".eE"):
-            return float(value)
+            number = float(value)
+            # A hex id such as "2e365266" parses as an overflowing float; JSON
+            # has no Infinity/NaN, so the browser would reject the whole snapshot.
+            return number if math.isfinite(number) else value
         return int(value)
     except ValueError:
         return value
@@ -189,7 +193,11 @@ def read_voice_benchmarks(log_root: Path, *, limit: int) -> dict[str, Any]:
             errors.append(f"{path.name}: {error}")
             continue
         for row in reversed(rows):
-            converted = {key: _json_value(value) for key, value in row.items()}
+            # Identifiers stay text: hex session ids like "39181e28" look numeric.
+            converted = {
+                key: value if key.endswith("_id") else _json_value(value)
+                for key, value in row.items()
+            }
             converted["_source_file"] = path.name
             output.append(converted)
             if len(output) >= limit:
@@ -343,6 +351,25 @@ def _elapsed_ms(start: Any, end: Any) -> float | None:
         return None
 
 
+# Fixed ids for events that belong to no request (model warm-ups, events with
+# no id at all). Grouping them would make one "trace" spanning every warm-up.
+_BACKGROUND_TRACE_IDS = {"unknown", "llm-preramp"}
+# The reply text is complete at these events; anything later (speech playback,
+# barge-in snapshots) is the voice worker speaking, not the request being slow.
+_RESPONSE_READY_EVENTS = {"agent_stream_completed", "text_stream_completed"}
+
+
+def _is_background_trace(trace_id: str, events: list[dict[str, Any]]) -> bool:
+    if trace_id in _BACKGROUND_TRACE_IDS:
+        return True
+    # Session-level events (e.g. the voice worker's "voice-worker" id) reuse the
+    # session id as their request id; real requests never do.
+    return all(
+        event.get("session_id") and event.get("request_id") == event.get("session_id")
+        for event in events
+    )
+
+
 def build_request_traces(events: list[dict[str, Any]], *, limit: int = 100) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for event in events:
@@ -350,6 +377,8 @@ def build_request_traces(events: list[dict[str, Any]], *, limit: int = 100) -> l
         grouped.setdefault(trace_id, []).append(event)
     traces = []
     for trace_id, trace_events in grouped.items():
+        if _is_background_trace(trace_id, trace_events):
+            continue
         ordered = sorted(trace_events, key=lambda item: str(item.get("timestamp") or ""))
         names = [str(item.get("event") or "unknown") for item in ordered]
         failures = [name for name in names if any(marker in name for marker in ("failed", "rejected", "interrupted", "timed_out", "dropped"))]
@@ -368,6 +397,12 @@ def build_request_traces(events: list[dict[str, Any]], *, limit: int = 100) -> l
             for item in ordered
         ]
         elapsed_ms = _elapsed_ms(ordered[0].get("timestamp"), ordered[-1].get("timestamp"))
+        response_ready = [item for item in ordered if item.get("event") in _RESPONSE_READY_EVENTS]
+        response_ms = (
+            _elapsed_ms(ordered[0].get("timestamp"), response_ready[-1].get("timestamp"))
+            if response_ready
+            else None
+        )
         traces.append({
             "trace_id": trace_id,
             "request_id": ordered[-1].get("request_id"),
@@ -379,6 +414,7 @@ def build_request_traces(events: list[dict[str, Any]], *, limit: int = 100) -> l
             "components": sorted({str(item.get("component") or "unknown") for item in ordered}),
             "stage_count": len(stages),
             "elapsed_ms": elapsed_ms,
+            "response_ms": response_ms,
             "stages": stages,
         })
     traces.sort(key=lambda item: str(item.get("finished_at") or ""), reverse=True)
@@ -386,10 +422,11 @@ def build_request_traces(events: list[dict[str, Any]], *, limit: int = 100) -> l
 
 
 def build_latency_summary(traces: list[dict[str, Any]]) -> dict[str, Any]:
+    # Time until the reply was ready; total elapsed also counts speech playback.
     values = sorted(
-        float(trace["elapsed_ms"])
+        float(trace["response_ms"])
         for trace in traces
-        if isinstance(trace.get("elapsed_ms"), (int, float))
+        if isinstance(trace.get("response_ms"), (int, float))
     )
     if not values:
         return {"count": 0, "p50_ms": None, "p95_ms": None, "max_ms": None}
@@ -751,6 +788,15 @@ def build_audio_snapshot(
         for event in telemetry.get("events", [])
         if event.get("event") == "barge_in_metrics_snapshot"
     ]
+    aec_status = next(
+        (
+            event
+            for event in telemetry.get("events", [])
+            if event.get("event")
+            in ("aec_barge_in_started", "aec_barge_in_unavailable")
+        ),
+        None,
+    )
     benchmark_rows = benchmarks.get("rows", [])
     series: dict[str, list[dict[str, Any]]] = {}
     for row in reversed(benchmark_rows):
@@ -758,18 +804,48 @@ def build_audio_snapshot(
             series.setdefault("input_rms", []).append(
                 {"timestamp": _benchmark_timestamp(row), "value": row["input_rms"]}
             )
+    # Snapshots carry running summaries since the voice worker started and are
+    # emitted after every reply, so plotting each one's "last" repeats stale
+    # values. Plot one point per snapshot that added measurements: the mean of
+    # just the new ones (from the running total), or "last" for older logs.
+    previous: dict[str, tuple[Any, float, float | None]] = {}
     for event in reversed(barge_events):
         timestamp = event.get("timestamp")
-        for name, value in (event.get("measurements") or {}).items():
-            if name.endswith("_last") and isinstance(value, (int, float)):
-                series.setdefault(name[: -len("_last")], []).append(
-                    {"timestamp": timestamp, "value": value}
+        process = event.get("pid")
+        measurements = event.get("measurements") or {}
+        for key, count in measurements.items():
+            if not key.endswith("_count") or not isinstance(count, (int, float)):
+                continue
+            name = key[: -len("_count")]
+            total = measurements.get(f"{name}_total")
+            total = float(total) if isinstance(total, (int, float)) else None
+            last_process, last_count, last_total = previous.get(name, (None, 0.0, None))
+            if process != last_process or count < last_count:
+                last_count, last_total = 0.0, 0.0  # a new voice worker process
+            previous[name] = (process, float(count), total)
+            if count <= last_count:
+                continue
+            if total is not None and last_total is not None:
+                value = (total - last_total) / (count - last_count)
+            else:
+                value = measurements.get(f"{name}_last")
+                if name == "pause_latency_ms" and value == 0:
+                    # Snapshots logged before totals existed recorded an
+                    # unmeasured VAD pause latency as 0 ms; it is never real.
+                    continue
+            if isinstance(value, (int, float)):
+                series.setdefault(name, []).append(
+                    {"timestamp": timestamp, "value": round(float(value), 3)}
                 )
     return {
         "status": "available" if series else "not_available",
         "source": "voice benchmark CSV and barge-in telemetry snapshots",
-        "sample_semantics": "Values update after an utterance or barge-in metrics snapshot; raw PCM is never read.",
+        "sample_semantics": (
+            "input_rms: one point per recognized utterance. Barge-in series: one point per reply "
+            "that produced new measurements (mean of those measurements); raw PCM is never read."
+        ),
         "latest_barge_in": barge_events[0] if barge_events else None,
+        "latest_aec_status": aec_status,
         "series": {name: values[-120:] for name, values in sorted(series.items())},
         "configured_thresholds": {
             "barge_in_floor_rms": _json_value(os.getenv("BUTLER_BARGE_IN_FLOOR_RMS", "550")),

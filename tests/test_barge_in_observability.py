@@ -68,6 +68,17 @@ class BargeInMetricsTests(unittest.TestCase):
         self.assertEqual(counters["candidate_rejected_other"], 1)
         self.assertNotIn("arbitrary-user-controlled-value", counters)
 
+    def test_vad_candidate_without_latency_records_no_pause_latency(self):
+        metrics = BargeInMetrics()
+
+        metrics.vad_candidate_started(probability=0.8)
+        metrics.vad_candidate_started(probability=0.9, pause_latency_ms=120)
+
+        measurements = metrics.snapshot()["measurements"]
+        self.assertEqual(measurements["pause_latency_ms"]["count"], 1)
+        self.assertEqual(measurements["pause_latency_ms"]["total"], 120)
+        self.assertEqual(measurements["vad_start_probability"]["count"], 2)
+
 
 class _Clock:
     def __init__(self) -> None:

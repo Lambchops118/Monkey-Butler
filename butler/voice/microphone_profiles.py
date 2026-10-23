@@ -17,6 +17,10 @@ class MicrophoneProfile:
     preferred_host_api: str
     energy_threshold: str
     windows_aec: bool
+    # Optional Windows friendly name pinned next to the capture ID. When set,
+    # a re-enumeration of this same device (new MMDevice ID) is followed
+    # instead of silently disabling AEC barge-in.
+    capture_endpoint_name_env: str = ""
 
 
 MICROPHONE_PROFILES = {
@@ -45,6 +49,7 @@ MICROPHONE_PROFILES = {
         # `python -m butler.voice.diagnostics.windows_aec_probe` and set this
         # back to False if the render path or the microphone changes.
         windows_aec=True,
+        capture_endpoint_name_env="BUTLER_RESPEAKER_CAPTURE_ENDPOINT_NAME",
     ),
     "yeti": MicrophoneProfile(
         name="yeti",
@@ -57,6 +62,7 @@ MICROPHONE_PROFILES = {
         preferred_host_api="MME",
         energy_threshold="500",
         windows_aec=True,
+        capture_endpoint_name_env="BUTLER_YETI_CAPTURE_ENDPOINT_NAME",
     ),
 }
 

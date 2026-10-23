@@ -57,6 +57,7 @@ class _Measurement:
         average = None if not self.count else round(self.total / self.count, 3)
         return {
             "count": self.count,
+            "total": round(self.total, 3),
             "min": self.minimum,
             "max": self.maximum,
             "average": average,
@@ -105,12 +106,14 @@ class BargeInMetrics:
         self,
         *,
         probability: float,
-        pause_latency_ms: float = 0.0,
+        pause_latency_ms: float | None = None,
     ) -> None:
         with self._lock:
             self._counters["candidate_started"] += 1
             self._add_locked("vad_start_probability", probability)
-            self._add_locked("pause_latency_ms", pause_latency_ms)
+            # Unmeasured latency is left out rather than recorded as 0 ms.
+            if pause_latency_ms is not None:
+                self._add_locked("pause_latency_ms", pause_latency_ms)
             self._vad_probability_observed = True
 
     def vad_capture_completed(

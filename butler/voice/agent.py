@@ -398,7 +398,7 @@ def _emit_barge_in_metrics(session: SpeechSession) -> None:
     for name, summary in (snapshot.get("measurements") or {}).items():
         if not isinstance(summary, dict):
             continue
-        for statistic in ("count", "min", "max", "average", "last"):
+        for statistic in ("count", "total", "min", "max", "average", "last"):
             measurements[f"{name}_{statistic}"] = summary.get(statistic)
     emit_pipeline_event(
         request_id=session.request_id or session.session_id or "voice",
@@ -1444,7 +1444,14 @@ def _on_barge_vad_candidate(probability: float) -> None:
     if session is None or session.is_cancelled:
         return
     session.duck()
-    _barge_in.record_vad_candidate(probability)
+    _barge_in.record_vad_candidate(
+        probability,
+        pause_latency_ms=(
+            _barge_vad_gate.last_candidate_latency_ms
+            if _barge_vad_gate is not None
+            else None
+        ),
+    )
 
 
 def _on_idle_vad_utterance(pcm: bytes, evidence: dict[str, float]) -> None:
@@ -1477,11 +1484,14 @@ def _on_clean_aec_frame(frame: bytes) -> None:
     _fixture_recorder.record_capture(frame)
     if not frame:
         return
-    _barge_in.record_aec_residual(float(audioop.rms(frame, 2)))
+    speaking = _duplex is not None and _duplex.speaking
+    if speaking:
+        # Echo left after cancellation only exists while Butler is talking;
+        # idle frames are room noise and would bury the residual.
+        _barge_in.record_aec_residual(float(audioop.rms(frame, 2)))
     if _barge_vad_gate is None:
         return
 
-    speaking = _duplex is not None and _duplex.speaking
     desired_lane = select_vad_lane(
         _vad_lane,
         barge_pending=_barge_vad_gate.has_pending_speech,
@@ -1540,6 +1550,7 @@ def _start_aec_duplex():
     from butler.voice.streaming.windows_audio import (
         WindowsAudioEndpoints,
         get_default_windows_audio_endpoints,
+        resolve_pinned_windows_audio_endpoints,
     )
 
     if not MICROPHONE_PROFILE.windows_aec:
@@ -1558,11 +1569,22 @@ def _start_aec_duplex():
             "AEC barge-in requires pinned BUTLER_AUDIO_CAPTURE_ENDPOINT_ID and "
             "BUTLER_AUDIO_RENDER_ENDPOINT_ID values."
         )
-    endpoints = WindowsAudioEndpoints(capture_id=capture_id, render_id=render_id)
-    if endpoints != defaults:
-        raise RuntimeError(
-            "Pinned Windows audio endpoint identity does not match the current "
-            "default capture/render pair."
+    capture_name = (
+        MICROPHONE_PROFILE.capture_endpoint_name_env
+        and os.getenv(MICROPHONE_PROFILE.capture_endpoint_name_env, "").strip()
+    ) or os.getenv("BUTLER_AUDIO_CAPTURE_ENDPOINT_NAME", "").strip()
+    resolution = resolve_pinned_windows_audio_endpoints(
+        WindowsAudioEndpoints(capture_id=capture_id, render_id=render_id),
+        defaults,
+        capture_name=capture_name,
+        render_name=os.getenv("BUTLER_AUDIO_RENDER_ENDPOINT_NAME", "").strip(),
+    )
+    endpoints = resolution.endpoints
+    if resolution.reenumerated:
+        print(
+            "Windows re-enumerated a pinned audio endpoint under a new ID; "
+            "following it by its pinned name. Update settings.env: "
+            f"capture={endpoints.capture_id} render={endpoints.render_id}"
         )
     _barge_probability_vad = SileroProbabilityVAD()
     _barge_vad_gate = BargeInVadGate(
@@ -1612,6 +1634,14 @@ def _start_aec_duplex():
     _barge_in_runtime_ready = True
     _vad_lane = None
     _vad_endpointing_active = IDLE_VAD_ENDPOINTING_ENABLED
+    emit_pipeline_event(
+        request_id=VOICE_SESSION_ID,
+        component="voice_worker",
+        event="aec_barge_in_started",
+        session_id=VOICE_SESSION_ID,
+        microphone_profile=MICROPHONE_PROFILE.name,
+        endpoints=resolution.details,
+    )
     print("AEC duplex capture started on the pinned Windows endpoints.")
     return _duplex
 
@@ -1662,6 +1692,18 @@ def run_voice_recognition():
         except Exception as exc:
             _barge_in_runtime_ready = False
             _vad_endpointing_active = False
+            # The console line alone was invisible: twice now a stale endpoint
+            # pin left barge-in silently off for days.
+            emit_pipeline_event(
+                request_id=VOICE_SESSION_ID,
+                component="voice_worker",
+                event="aec_barge_in_unavailable",
+                session_id=VOICE_SESSION_ID,
+                microphone_profile=MICROPHONE_PROFILE.name,
+                error_type=type(exc).__name__,
+                error=str(exc)[:500],
+                endpoints=getattr(exc, "details", None) or {},
+            )
             print(
                 "AEC barge-in is unavailable and has been disabled; ordinary "
                 f"wake-word capture remains active: {exc}"

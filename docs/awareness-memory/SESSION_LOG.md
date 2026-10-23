@@ -1550,3 +1550,58 @@ patch `get_default_memory_store` with an in-memory store at module level, and a
 re-run added no rows. Removed 4 fixture facts and 40 fixture messages, and
 cleared the test-only `main-pc` and `phone:inbound` session summaries. The
 database was backed up first.
+
+## 2026-10-18 — Barge-in silently disabled by stale capture pin (again)
+
+**Symptom:** Owner reported barge-in stopped working again.
+
+**Cause:** Same failure as 2026-10-02. Windows re-enumerated the ReSpeaker
+XVF3800 ("Echo Cancelling Speakerphone") as capture endpoint `...0670a5da...`.
+The pinned `...de76a30a...` endpoint no longer exists in HKLM MMDevices, so the
+default-pair check in `_start_aec_duplex` raised and the worker fell back to
+the plain microphone. The render pin (`...d43b40c9...`, BenQ) was still current.
+
+**Change:** Re-pinned `BUTLER_RESPEAKER_CAPTURE_ENDPOINT_ID` and
+`BUTLER_AUDIO_CAPTURE_ENDPOINT_ID` to `...0670a5da...` in `settings.env`.
+
+**Validation:** In `.venv-voice`, the pins as parsed from `settings.env` equal
+the current default pair, and `query_windows_aec` reports AEC enabled with
+`reference_mode='system_default_verified'`. Not run live: no voice session
+was restarted and no barge-in was attempted by the agent.
+
+## 2026-10-18 — Barge-in follows endpoint re-enumeration; fallback is observable
+
+**Request:** Owner asked to stop barge-in failing silently whenever Windows
+re-enumerates the audio endpoints (2026-10-02 and 2026-10-18 incidents above).
+
+**Change:**
+- `butler/voice/streaming/windows_audio.py`: `resolve_pinned_windows_audio_endpoints`
+  replaces the bare pinned-vs-default equality in `_start_aec_duplex`. A side
+  whose pin differs is followed to the current default only if a pinned
+  friendly name is configured, the old pinned endpoint is no longer active,
+  the default is active and carries exactly that name (Windows'
+  "Description (Interface)" form, read from HKLM MMDevices), and no other
+  active endpoint of that flow shares it. Otherwise it still fails closed;
+  without configured names behavior is unchanged. `query_windows_aec` still
+  gates on an active AEC effect.
+- `butler/voice/agent.py`: emits `aec_barge_in_started` (with per-side
+  resolution) and `aec_barge_in_unavailable` (error and pinned/default IDs and
+  names) pipeline events. A followed re-enumeration prints the new IDs to copy
+  into `settings.env`.
+- Profiles gained `capture_endpoint_name_env`; `settings.env` pins
+  `BUTLER_RESPEAKER_CAPTURE_ENDPOINT_NAME`, `BUTLER_YETI_CAPTURE_ENDPOINT_NAME`
+  and `BUTLER_AUDIO_RENDER_ENDPOINT_NAME`.
+- Debug console Live Audio tab shows an "AEC barge-in" ON / ON (NEW ID) / OFF card.
+
+**Validation:** Voice, barge-in, launcher, microphone, duplex and dashboard
+unittest files all pass in `.venv-runtime` (13 resolver/parser tests, 1 new
+fallback-telemetry test, 1 new dashboard test). Against the live registry, the
+current pins resolve as `pinned`; today's stale `...de76a30a...` pin resolves
+to `...0670a5da...` as `reenumerated` and AEC reports enabled on it; the same
+stale pin without names, and the Yeti pin against the ReSpeaker default, are
+refused. The card was checked in the browser with injected events. Not run
+live: the voice worker was not restarted.
+
+**Observed, not fixed:** the debug console snapshot fails to parse in the
+browser because a `voice_benchmarks.csv` row (2026-10-13T21:05) has
+`session_id` read as float infinity and serialized as `Infinity`.
