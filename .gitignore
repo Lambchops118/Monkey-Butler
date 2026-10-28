@@ -39,3 +39,6 @@ butler/logs/
 
 # Local artifact/data directory for the awareness subsystem
 db/awareness/
+
+# Local API key files
+API KEYS/

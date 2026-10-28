@@ -43,6 +43,11 @@ from butler.voice.streaming.barge_in_observability import (
     SynchronizedFixtureRecorder,
 )
 from butler.voice.streaming.speaker import StreamingSpeaker
+from butler.voice.speaker_outputs import (
+    find_output_device_index,
+    get_speaker_output,
+    uses_hardware_aec,
+)
 from butler.voice.streaming.vad import select_vad_lane
 
 
@@ -52,6 +57,10 @@ r = sr.Recognizer()
 MICROPHONE_PROFILE = get_microphone_profile(
     os.getenv("BUTLER_MICROPHONE_PROFILE", "respeaker")
 )
+SPEAKER_OUTPUT = get_speaker_output(os.getenv("BUTLER_SPEAKER_OUTPUT", "system"))
+# The XVF3800 cancels its own USB playback on-chip, so this pair needs no
+# Windows AEC and works on every platform.
+HARDWARE_AEC = uses_hardware_aec(SPEAKER_OUTPUT.name, MICROPHONE_PROFILE.name)
 WAKE_WORD = os.getenv("WAKE_WORD", "butler").lower()
 # What to remove from the front of a transcript once the wake word is found.
 #
@@ -286,9 +295,21 @@ def _get_remote_stt_client():
     return _remote_stt_client
 
 
+_named_output_index: int | None = None
+
+
 def _resolve_output_device_index():
+    global _named_output_index
     if not VOICE_AUDIO_OUTPUT_DEVICE_INDEX:
-        return None
+        if not SPEAKER_OUTPUT.device_name_env:
+            return None
+        if _named_output_index is None:
+            name = (
+                os.getenv(SPEAKER_OUTPUT.device_name_env, "").strip()
+                or SPEAKER_OUTPUT.default_device_name
+            )
+            _named_output_index = find_output_device_index(audio_interface, name)
+        return _named_output_index
     try:
         return int(VOICE_AUDIO_OUTPUT_DEVICE_INDEX)
     except ValueError as exc:
@@ -1532,21 +1553,56 @@ def _start_aec_duplex():
     global _barge_probability_vad, _idle_probability_vad
     global _barge_in_runtime_ready, _vad_endpointing_active, _vad_lane
     from butler.voice.streaming.duplex import build_windows_duplex_pipeline
-    from butler.voice.streaming.vad import (
-        BargeInVadGate,
-        SileroProbabilityVAD,
-        VadGateConfig,
-    )
     from butler.voice.streaming.windows_audio import (
         WindowsAudioEndpoints,
         get_default_windows_audio_endpoints,
     )
 
-    if not MICROPHONE_PROFILE.windows_aec:
+    if HARDWARE_AEC:
+        endpoints = None
+    elif not MICROPHONE_PROFILE.windows_aec:
         raise RuntimeError(
             f"Windows AEC is not enabled for microphone profile "
             f"'{MICROPHONE_PROFILE.name}'."
         )
+    else:
+        endpoints = _pinned_windows_endpoints(
+            WindowsAudioEndpoints, get_default_windows_audio_endpoints
+        )
+    _start_aec_vad_gates()
+    if endpoints is None:
+        from butler.voice.streaming.duplex import DuplexAudioPipeline
+        from butler.voice.streaming.portaudio_input import PortAudioDeviceAecCapture
+
+        device_name = (
+            os.getenv(MICROPHONE_PROFILE.device_name_env, "").strip()
+            or MICROPHONE_PROFILE.default_device_name
+        )
+        _duplex = DuplexAudioPipeline(
+            PortAudioDeviceAecCapture(
+                name_contains=device_name,
+                preferred_host_api=MICROPHONE_PROFILE.preferred_host_api,
+                source_channels=MICROPHONE_PROFILE.source_channels,
+                selected_channel=MICROPHONE_PROFILE.selected_channel,
+            ),
+            on_clean_frame=_on_clean_aec_frame,
+        )
+        where = f"{SPEAKER_OUTPUT.label} with on-chip echo cancellation"
+    else:
+        _duplex = build_windows_duplex_pipeline(
+            endpoints,
+            on_clean_frame=_on_clean_aec_frame,
+        )
+        where = "the pinned Windows endpoints"
+    _duplex.start()
+    _barge_in_runtime_ready = True
+    _vad_lane = None
+    _vad_endpointing_active = IDLE_VAD_ENDPOINTING_ENABLED
+    print(f"AEC duplex capture started on {where}.")
+    return _duplex
+
+
+def _pinned_windows_endpoints(WindowsAudioEndpoints, get_default_windows_audio_endpoints):
     defaults = get_default_windows_audio_endpoints()
     capture_id = (
         os.getenv(MICROPHONE_PROFILE.capture_endpoint_env, "").strip()
@@ -1564,6 +1620,18 @@ def _start_aec_duplex():
             "Pinned Windows audio endpoint identity does not match the current "
             "default capture/render pair."
         )
+    return endpoints
+
+
+def _start_aec_vad_gates():
+    global _barge_vad_gate, _idle_vad_gate
+    global _barge_probability_vad, _idle_probability_vad
+    from butler.voice.streaming.vad import (
+        BargeInVadGate,
+        SileroProbabilityVAD,
+        VadGateConfig,
+    )
+
     _barge_probability_vad = SileroProbabilityVAD()
     _barge_vad_gate = BargeInVadGate(
         _barge_probability_vad.probability,
@@ -1604,16 +1672,6 @@ def _start_aec_duplex():
     else:
         _idle_probability_vad = None
         _idle_vad_gate = None
-    _duplex = build_windows_duplex_pipeline(
-        endpoints,
-        on_clean_frame=_on_clean_aec_frame,
-    )
-    _duplex.start()
-    _barge_in_runtime_ready = True
-    _vad_lane = None
-    _vad_endpointing_active = IDLE_VAD_ENDPOINTING_ENABLED
-    print("AEC duplex capture started on the pinned Windows endpoints.")
-    return _duplex
 
 
 def run_voice_recognition():
@@ -1630,7 +1688,7 @@ def run_voice_recognition():
             "Idle VAD endpointing was requested but remains disabled until "
             "BUTLER_IDLE_VAD_CORPUS_ACCEPTED=1. Using SpeechRecognition."
         )
-    if not MICROPHONE_PROFILE.windows_aec:
+    if not (MICROPHONE_PROFILE.windows_aec or HARDWARE_AEC):
         _barge_in_runtime_ready = False
         _vad_endpointing_active = False
         if BARGE_IN_ENABLED:

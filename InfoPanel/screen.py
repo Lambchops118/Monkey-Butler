@@ -1,4 +1,5 @@
 
+import os
 import sys
 import time
 import queue
@@ -108,6 +109,11 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
 
     display_w, display_h = info.current_w, info.current_h
     screen_width, screen_height = choose_window_size(display_w, display_h)
+    # Opt-in fullscreen (BUTLER_DISPLAY_FULLSCREEN=1) at the native resolution.
+    fullscreen = os.getenv("BUTLER_DISPLAY_FULLSCREEN", "0").strip().lower() in ("1", "true", "yes", "on")
+    window_flags = pygame.FULLSCREEN if fullscreen else 0
+    if fullscreen:
+        screen_width, screen_height = display_w, display_h
 
     #w = screen_width
     #h = screen_height
@@ -127,13 +133,15 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
     try:
         crt = GpuCRT(window_size=(screen_width, screen_height),
                kx=0.18, ky=0.16, curv=0.3,
-               scan=0.18, vign=0.45, gamma=2.0)
+               scan=0.18, vign=0.45, gamma=2.0,
+               extra_flags=window_flags)
         print("GPU CRT effect enabled.")
     except Exception as exc:
         print(f"GPU CRT unavailable, falling back to standard Pygame rendering: {exc}")
-        screen = pygame.display.set_mode((screen_width, screen_height))
+        screen = pygame.display.set_mode((screen_width, screen_height), window_flags)
 
     pygame.display.set_caption("Monkey Butler")
+    pygame.mouse.set_visible(False)
 
     scale_x = screen_width / base_w
     scale_y = screen_height / base_h
@@ -426,7 +434,7 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
             if display_level < 1.0:
                 level = int(round(255 * display_level))
                 post.fill((level, level, level), special_flags=pygame.BLEND_MULT)
-            screen.blit(post, (0, fx.random_vertical_jitter_y(100)))
+            screen.blit(post, (0, 0))
             pygame.display.flip()
         #last_frame = post
 
