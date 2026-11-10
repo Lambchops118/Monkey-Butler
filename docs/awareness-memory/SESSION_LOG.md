@@ -1495,3 +1495,126 @@ suites via `unittest discover -s tests -t tests -p "test_launcher*.py"` in
 `.venv-runtime`: 28 passed. Live helper check: started the console in 1.2 s,
 `/api/health` returned 200, and the port closed after `stop()`. The Tk button
 itself was not clicked in a live launcher window.
+
+## 2026-11-10 — Foreground/background rework design record
+
+Session goal: Record the conversation and implementation plan for local,
+nonblocking foreground/background work.
+
+Current phase: Bounded architecture consultation and documentation; no awareness
+runtime phase or background rework phase started.
+
+Bounded task completed: Added a top-level design record with current behavior,
+owner constraints, proposed interaction contract, staged work, acceptance checks,
+and open choices.
+
+Files added: `background_rework_11102026.md`.
+
+Files modified: `docs/awareness-memory/IMPLEMENTATION_STATUS.md`,
+`DECISIONS.md`, `OPEN_QUESTIONS.md`, and `SESSION_LOG.md`.
+
+Migrations added: None.
+
+Decisions made: Documented owner direction: local-only inference by default,
+foreground responsiveness and job awareness, model-generated ordinary speech,
+and A2000 availability if measurements warrant it. No runtime design choice was
+accepted for implementation.
+
+Assumptions confirmed or changed: Current streaming voice bypasses router job
+routing; current background executor uses the hosted Responses path. This is a
+source inspection, not a deployed-host validation.
+
+Tests run: None; documentation-only change. Documentation links and diff
+whitespace will be checked before handoff.
+
+Tests passed: None at the time of this entry.
+
+Tests failed: None at the time of this entry.
+
+Commands not run: Python test suites, live voice/hardware runs, GPU benchmarks,
+model placement checks, deployment.
+
+Known limitations: The plan does not establish GPU fit, latency targets,
+background model quality, or notification timing.
+
+Security implications: No runtime surface changed. The plan preserves local
+inference and registered action authorization/audit.
+
+Deployment implications: None yet.
+
+Unresolved questions: Foreground latency target, completion-delivery timing,
+A2000 model/context fit, and cancellation/restart policy.
+
+Current repository state: `main` tracked files were clean before this task;
+the pre-existing untracked `Peripherals/Pump-Power-Controller` was untouched.
+
+Next permitted task: Owner-approved, bounded implementation step from the
+proposal, beginning with contracts and baseline measurements.
+
+Required reading for next session: Top-level design record, this status file,
+`ARCHITECTURAL_INVARIANTS.md`, and relevant current runtime/job/action code.
+
+Explicit stop point: Documentation complete; no runtime work started.
+
+## 2026-11-10 — Model interaction surface design record
+
+Session goal: Document discrepancies and fixes needed across `/chat`,
+`/chat/stream`, voice, terminal, browser, SMS, and background jobs.
+
+Current phase: Bounded architecture consultation and documentation; no runtime
+phase started.
+
+Bounded task completed: Added a top-level interaction-surface proposal with
+current routing/provider paths, a common turn/event/result contract, a bounded
+migration sequence, and acceptance checks.
+
+Files added: `interaction_surface_rework_11102026.md`.
+
+Files modified: `docs/awareness-memory/IMPLEMENTATION_STATUS.md`,
+`DECISIONS.md`, `OPEN_QUESTIONS.md`, and `SESSION_LOG.md`.
+
+Migrations added: None.
+
+Decisions made: Recorded the owner's direction for consistent client behavior
+and local-first inference; no API shape or runtime migration accepted yet.
+
+Assumptions confirmed or changed: `/chat` uses the router and hosted Responses
+agent loop; `/chat/stream` directly uses the configured streaming backend;
+the latter hardcodes voice interaction mode. Terminal/browser and SMS use the
+nonstreaming path, and background jobs call the hosted loop. Source inspection
+only; no deployed system validation.
+
+Tests run: None; documentation-only task. Link and diff checks performed at
+handoff.
+
+Tests passed: None (no test suite run).
+
+Tests failed: None (no test suite run).
+
+Commands not run: Python tests, live local-model calls, browser/voice/SMS
+end-to-end sessions, hardware tests, deployment.
+
+Known limitations: The proposal has not selected a final HTTP endpoint shape
+or measured behavioral parity and latency.
+
+Security implications: No runtime access changed. The design calls for explicit
+provider selection and no silent remote fallback.
+
+Deployment implications: None yet.
+
+Unresolved questions: Final endpoint shape, asynchronous completion delivery,
+partial-output errors, hosted-debug control.
+
+Current repository state: Existing documentation edits and top-level background
+proposal from the prior bounded task remain in the worktree; `settings.env` was
+already modified before this task and was left untouched. The pre-existing
+untracked `Peripherals/Pump-Power-Controller` was untouched.
+
+Next permitted task: A separately assigned, bounded characterization or
+implementation step from the proposal.
+
+Required reading for next session: This design record,
+`ARCHITECTURAL_INVARIANTS.md`, `TOOL_IMPLEMENTATION_GUIDE.md` if agent-facing
+tools change, and current text/router/runtime/client code.
+
+Explicit stop point: Documentation complete; no runtime work started.

@@ -2,6 +2,25 @@
 
 This file reports implementation state, not documentation availability.
 
+## Current consultation — model interaction surfaces (2026-11-10)
+
+The owner requested a top-level discrepancy and migration plan at
+[`interaction_surface_rework_11102026.md`](../../interaction_surface_rework_11102026.md).
+It documents the `/chat` versus `/chat/stream` provider/runtime split, other
+client ingress paths, a proposed common turn contract, staged migration, and
+acceptance checks. No route, client, model policy, or runtime code changed.
+Stop at this documentation task pending a bounded implementation assignment.
+
+## Current consultation — foreground/background design (2026-11-10)
+
+The owner requested a top-level design record at
+[`background_rework_11102026.md`](../../background_rework_11102026.md).
+It documents current routing/job limitations, local-first and voice requirements,
+an implementation sequence, acceptance checks, and open deployment choices.
+**No foreground/background runtime work, migration, or deployment change has
+started.** See the 2026-11-10 session log; stop at documentation pending a
+separately bounded implementation assignment.
+
 ## Current observability addition — Model & Memory dashboard tab (2026-10-03)
 
 The debug console has a new Model & Memory tab: first-vs-follow-up LLM latency
