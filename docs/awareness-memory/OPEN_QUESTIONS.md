@@ -1,5 +1,14 @@
 # Open Questions
 
+## Wake-only voice product choices (2026-11-10)
+
+See [`voice_wake_interaction_requirements_11102026.md`](../../voice_wake_interaction_requirements_11102026.md).
+The deployed-host response timing target, exact wake/listening feedback,
+listening-window duration, and policy for continuing conversation after a
+completed answer remain open. The coding agent must choose implementation
+mechanics within the documented behavior and repository invariants; no design
+choice is implied by this requirements record.
+
 ## Model interaction surface choices (2026-11-10)
 
 See [`interaction_surface_rework_11102026.md`](../../interaction_surface_rework_11102026.md).

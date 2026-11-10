@@ -2,6 +2,15 @@
 
 This file reports implementation state, not documentation availability.
 
+## Current consultation — wake-only voice interaction requirements (2026-11-10)
+
+The owner requested a behavior-only specification at
+[`voice_wake_interaction_requirements_11102026.md`](../../voice_wake_interaction_requirements_11102026.md).
+It covers one-utterance and wake-then-command requests, response truth,
+interruption, and acceptance scenarios. No voice or runtime behavior changed.
+Implementation details and live ReSpeaker acceptance remain pending a bounded
+owner assignment; stop at this documentation task.
+
 ## Current consultation — model interaction surfaces (2026-11-10)
 
 The owner requested a top-level discrepancy and migration plan at

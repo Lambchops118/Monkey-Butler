@@ -1618,3 +1618,62 @@ Required reading for next session: This design record,
 tools change, and current text/router/runtime/client code.
 
 Explicit stop point: Documentation complete; no runtime work started.
+
+## 2026-11-10 — Wake-only voice interaction requirements
+
+Session goal: Specify the desired one-utterance and wake-then-command voice
+experience without prescribing implementation mechanics.
+
+Current phase: Bounded requirements documentation; no voice runtime phase
+started.
+
+Bounded task completed: Added top-level requirements and acceptance scenarios
+for both voice entry patterns, truthful action acknowledgements, interruptions,
+timeouts, and local model wording.
+
+Files added: `voice_wake_interaction_requirements_11102026.md`.
+
+Files modified: `docs/awareness-memory/IMPLEMENTATION_STATUS.md`,
+`DECISIONS.md`, `OPEN_QUESTIONS.md`, and `SESSION_LOG.md`.
+
+Migrations added: None.
+
+Decisions made: Recorded the owner's two required voice patterns and preference
+for local model-generated ordinary speech. No technical design was selected.
+
+Assumptions confirmed or changed: Source inspection showed wake-only transcripts
+are rejected after the existing cue, and a later phrase without the wake word
+is rejected. No live microphone result was claimed.
+
+Tests run: None; documentation-only change. Link and whitespace checks performed
+at handoff.
+
+Tests passed: None (no test suite run).
+
+Tests failed: None (no test suite run).
+
+Commands not run: Python tests, live ReSpeaker/audio corpus, model latency
+benchmarks, hardware actions, deployment.
+
+Known limitations: No user-approved response timing target, listening-window
+duration, or continued-conversation policy yet.
+
+Security implications: No access changed. Requirements retain local inference,
+authorized action boundaries, and bounded diagnostics.
+
+Deployment implications: None yet.
+
+Unresolved questions: Response timing, listening feedback and timeout, optional
+continued conversation after a completed turn.
+
+Current repository state: `main` tracked files were clean before this task;
+the pre-existing untracked `Peripherals/Pump-Power-Controller` was untouched.
+
+Next permitted task: A separately authorized, bounded implementation of these
+voice requirements within the existing phase rules.
+
+Required reading for next session: This requirements file,
+`ARCHITECTURAL_INVARIANTS.md`, current voice callback/recognition tests, and
+the relevant action and audio paths.
+
+Explicit stop point: Requirements documented; no runtime work started.
