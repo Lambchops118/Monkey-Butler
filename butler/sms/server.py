@@ -22,12 +22,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 from urllib.parse import parse_qs
 
+from butler.agent.conversation import resolve_session
 from butler.messages import Message, TextPayload
 from butler.sms.twilio import SmsConfig, is_valid_signature, send_sms
 
 
 SMS_TURN_CONTEXT = (
-    "This request arrived as an SMS text message from the owner's phone; the reply "
+    "This request arrived as an SMS text message; the reply "
     "is sent back as a text. Keep it short and plain text: no markdown, headings, "
     "or code blocks. Lead with the outcome. Nothing is spoken aloud in the room."
 )
@@ -133,7 +134,11 @@ class SmsWebhookHandler(BaseHTTPRequestHandler):
 
 def handle_inbound_text(server: SmsWebhookServer, sender: str, body: str) -> None:
     """Run one texted command through the agent and text back the result."""
-    session_id = f"sms:{sender}"
+    allowed_senders = server.config.allowed_senders
+    owner_sender = server.config.owner_sender or (
+        allowed_senders[0] if len(allowed_senders) == 1 else ""
+    )
+    session_id = resolve_session(f"sms:{sender}", owner=sender == owner_sender)
     print(f"[sms] command from {_mask(sender)}: {body[:80]!r}")
     reply_queue: queue.Queue = queue.Queue(maxsize=1)
     server.central_queue.put(
@@ -145,6 +150,7 @@ def handle_inbound_text(server: SmsWebhookServer, sender: str, body: str) -> Non
                 source="sms",
                 reply_queue=reply_queue,
                 extra_context=SMS_TURN_CONTEXT,
+                tool_access="full" if sender == owner_sender else "restricted",
             ),
         )
     )

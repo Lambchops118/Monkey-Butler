@@ -9,6 +9,7 @@ import threading
 import time
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator
+from uuid import uuid4
 
 import openai
 
@@ -42,7 +43,6 @@ load_environment()
 _client: openai.OpenAI | None = None
 
 ai_model = os.getenv("OPENAI_VOICE_MODEL", "gpt-4o-mini")
-ROUTER_MODEL = os.getenv("BUTLER_ROUTER_MODEL", ai_model)
 MAX_TOOL_CALL_ROUNDS = max(1, env_int("BUTLER_MAX_TOOL_CALL_ROUNDS", 8))
 MEMORY_ENABLED = env_bool("BUTLER_MEMORY_ENABLED", True)
 # Debug: drop the entire tool layer (MCP servers and the agent's own host tools)
@@ -805,6 +805,7 @@ def note_interruption(
     spoken_text: str,
     *,
     runtime_lane: str = "foreground",
+    request_id: str | None = None,
 ) -> bool:
     """Rewrite the last assistant turn to what the user actually heard.
 
@@ -827,6 +828,12 @@ def note_interruption(
     lock = _get_conversation_lock(_response_thread_key(session_id, runtime_lane))
     acquired = lock.acquire(timeout=INTERRUPTION_LOCK_TIMEOUT_SECONDS)
     try:
+        if request_id:
+            if not acquired:
+                return False
+            return memory_store.amend_last_assistant_message(
+                session_id, content, request_id=request_id
+            )
         return memory_store.amend_last_assistant_message(session_id, content)
     except Exception as exc:
         print(f"Butler interruption record failed: {_truncate_text(str(exc), 300)}")
@@ -966,6 +973,7 @@ def _record_memory_turn(
     interaction_mode: str,
     tool_messages: list[dict[str, Any]] | None = None,
     tool_schemas: list[dict[str, Any]] | None = None,
+    request_id: str | None = None,
 ) -> None:
     if memory_store is None:
         return
@@ -974,7 +982,10 @@ def _record_memory_turn(
             session_id,
             command,
             response_text,
-            metadata={"interaction_mode": interaction_mode},
+            metadata={
+                "interaction_mode": interaction_mode,
+                **({"request_id": request_id} if request_id else {}),
+            },
             tool_messages=tool_messages,
             tool_schemas=tool_schemas,
         )
@@ -1162,14 +1173,12 @@ def classify_request_route(
         },
         {"role": "user", "content": command},
     ]
-    response = _responses_create_with_retry(
-        model=ROUTER_MODEL,
-        instructions=instructions,
-        input=input_items,
+    response = _get_stream_backend().complete(
+        [{"role": "system", "content": instructions}, *input_items],
         temperature=0,
-        max_output_tokens=120,
+        max_tokens=256,
     )
-    payload = _parse_router_payload(str(response.output_text or ""))
+    payload = _parse_router_payload(response.text)
     mode = payload.get("mode", "foreground").strip().lower()
     if mode not in {"foreground", "background", "status"}:
         mode = "foreground"
@@ -2541,12 +2550,14 @@ def run_command_stream(
             except Exception as exc:
                 print(f"Butler memory session write failed: {_truncate_text(str(exc), 300)}")
                 memory_store = None
-        memory_block = _get_prompt_memory(
-            memory_store,
-            session_id,
-            command,
-            include_session_summary=False,
-        )
+        memory_block = None
+        if tool_access == _tool_access.FULL:
+            memory_block = _get_prompt_memory(
+                memory_store,
+                session_id,
+                command,
+                include_session_summary=False,
+            )
         conversation_history = _get_conversation_history(memory_store, session_id)
         memory_context_ms = round((time.perf_counter() - memory_started) * 1000.0, 1)
         tool_build_started = time.perf_counter()
@@ -2637,6 +2648,8 @@ def run_command_stream(
             tool_defs,
             request_id=telemetry_id,
         )
+        if cancel is not None and cancel.is_set():
+            return
         if pre_routed_call is not None:
             pre_routed_calls = (pre_routed_call,)
             messages.append(tool_calls_to_assistant_message("", pre_routed_calls))
@@ -2685,6 +2698,7 @@ def run_command_stream(
                 interaction_mode=mode,
                 tool_messages=tool_history,
                 tool_schemas=tool_defs,
+                request_id=request_id,
             )
             yield result_note
             _emit_runtime_telemetry(
@@ -2906,6 +2920,7 @@ def run_command_stream(
                 interaction_mode=mode,
                 tool_messages=tool_history,
                 tool_schemas=tool_defs,
+                request_id=request_id,
             )
         _emit_runtime_telemetry(
             telemetry_callback,
@@ -2918,6 +2933,34 @@ def run_command_stream(
                 (time.perf_counter() - pipeline_started) * 1000.0, 1
             ),
         )
+
+
+def collect_command(
+    command: str,
+    state_snapshot: str,
+    *,
+    session_id: str,
+    interaction_mode: str,
+    runtime_lane: str,
+    extra_context: str | None,
+    tool_access: str,
+    request_id: str | None = None,
+) -> str:
+    """Collect a turn from the same engine that produces incremental replies."""
+    deltas = run_command_stream(
+        command,
+        state_snapshot,
+        session_id=session_id,
+        interaction_mode=interaction_mode,
+        runtime_lane=runtime_lane,
+        extra_context=extra_context,
+        tool_access=tool_access,
+        request_id=request_id or uuid4().hex,
+    )
+    response = "".join(deltas).strip()
+    if not response:
+        raise RuntimeError("The turn ended without a reply.")
+    return response
 
 
 def reset_session(session_id: str) -> None:

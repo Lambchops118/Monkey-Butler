@@ -37,14 +37,16 @@ class MemoryStoreTests(unittest.TestCase):
                               tool_schemas=[schema, {"name": "unused"}])
             store.close()
             store = MemoryStore(path)
-            self.addCleanup(store.close)
-            history = store.get_recent_messages("voice")
-            self.assertEqual([m["role"] for m in history], ["user", "assistant", "tool", "assistant"])
-            self.assertEqual(history[1]["tool_calls"][0]["function"]["arguments"], '{"entity_id":"pump"}')
-            self.assertEqual(history[2], self._exchange()[1])
-            row = store._conn.execute("SELECT metadata_json FROM messages WHERE role='assistant'").fetchone()
-            self.assertEqual(json.loads(row[0])["tool_history"]["schemas"], [schema])
-            self.assertEqual(history[1]["content"], "")
+            try:
+                history = store.get_recent_messages("voice")
+                self.assertEqual([m["role"] for m in history], ["user", "assistant", "tool", "assistant"])
+                self.assertEqual(history[1]["tool_calls"][0]["function"]["arguments"], '{"entity_id":"pump"}')
+                self.assertEqual(history[2], self._exchange()[1])
+                row = store._conn.execute("SELECT metadata_json FROM messages WHERE role='assistant'").fetchone()
+                self.assertEqual(json.loads(row[0])["tool_history"]["schemas"], [schema])
+                self.assertEqual(history[1]["content"], "")
+            finally:
+                store.close()
 
     def test_tool_turn_is_dropped_whole_under_either_budget(self):
         store = MemoryStore(":memory:")
@@ -87,6 +89,16 @@ class MemoryStoreTests(unittest.TestCase):
         history = store.get_recent_messages("voice")
         self.assertEqual([m["tool_call_id"] for m in history if m["role"] == "tool"], ["call-1", "call-2"])
         self.assertIn('"error":"unavailable"', history[-2]["content"])
+
+    def test_late_voice_interruption_targets_its_own_shared_turn(self):
+        store = MemoryStore(":memory:")
+        self.addCleanup(store.close)
+        store.record_turn("owner", "Voice", "Voice reply", metadata={"request_id": "voice-1"})
+        store.record_turn("owner", "Text", "Text reply")
+        self.assertTrue(store.amend_last_assistant_message("owner", "Heard", request_id="voice-1"))
+        self.assertFalse(store.amend_last_assistant_message("owner", "Unknown", request_id="missing"))
+        history = store.get_recent_messages("owner")
+        self.assertEqual([message["content"] for message in history], ["Voice", "Heard", "Text", "Text reply"])
 
     def test_persists_facts_summaries_and_session_turns_across_restarts(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

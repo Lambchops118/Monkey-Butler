@@ -96,8 +96,11 @@ def _run_agent_command(
     runtime_lane: str = "foreground",
     extra_context: str | None = None,
     tool_access: str = "full",
+    legacy: bool = False,
+    request_id: str | None = None,
 ) -> str:
-    response_text = agent_runtime.run_command(
+    execute = agent_runtime.run_command if legacy else agent_runtime.collect_command
+    response_text = execute(
         command,
         snapshot,
         session_id=session_id,
@@ -105,15 +108,15 @@ def _run_agent_command(
         runtime_lane=runtime_lane,
         extra_context=extra_context,
         tool_access=tool_access,
+        **({"request_id": request_id} if not legacy and request_id else {}),
     )
     display_sink.put(("VOICE_CMD", command, response_text))
     return response_text
 
 
-def _interaction_mode_for_source(source: str, session_id: str) -> str:
+def interaction_mode_for_source(source: str) -> str:
     normalized_source = str(source or "").strip().lower()
-    normalized_session = str(session_id or "").strip().lower()
-    if normalized_source.startswith("voice") or normalized_session.startswith("voice"):
+    if normalized_source in {"voice", "discord"} or normalized_source.startswith("voice:"):
         return "voice"
     return "text"
 
@@ -168,6 +171,22 @@ def _runtime_context_for_session(session_id: str, *, limit: int = 6) -> str:
     lines.append("- Recent jobs:")
     lines.extend(f"  - {_format_job_status(job, include_request=True)}" for job in jobs[:limit])
     return "\n".join(lines)
+
+
+def turn_context(session_id: str, tool_access: str, extra_context: str | None) -> str | None:
+    if tool_access != "full":
+        return extra_context
+    job_context = _runtime_context_for_session(session_id)
+    return f"{job_context}\n\n{extra_context}" if extra_context else job_context
+
+
+def request_uses_background(command: str, source: str, mode: str, access: str) -> bool:
+    decision = classify_request(command, source=source, requested_mode=mode)
+    return (
+        access == "full"
+        and decision.reason == "explicit background request"
+        and not _must_run_in_foreground(command)
+    )
 
 
 def _classify_with_context(
@@ -262,6 +281,7 @@ def router_loop(central_queue: queue.Queue, display_sink, stop_signal: Optional[
             session_id=job.session_id,
             interaction_mode=str((job.metadata or {}).get("interaction_mode") or "text"),
             runtime_lane="background",
+            request_id=job.job_id,
         )
     )
     try:
@@ -364,23 +384,13 @@ def router_loop(central_queue: queue.Queue, display_sink, stop_signal: Optional[
 
             elif msg.type == "text_cmd":
                 tp: TextPayload = msg.payload
+                legacy = tp.legacy_phone
                 snapshot = awareness_client.snapshot_with_fallback(state.snapshot())
-                interaction_mode = _interaction_mode_for_source(tp.source, tp.session_id)
-                runtime_context = _runtime_context_for_session(tp.session_id)
-                if tp.extra_context:
-                    # Ingress-supplied context for this turn only (e.g. sleep
-                    # mode was just toggled before the model was invoked).
-                    runtime_context = f"{runtime_context}\n\n{tp.extra_context}"
-                decision = _classify_with_context(
-                    tp.command,
-                    source=tp.source,
-                    session_id=tp.session_id,
-                    runtime_context=runtime_context,
-                    requested_mode=tp.requested_mode,
-                    allow_model_route=VOICE_MODEL_ROUTING_ENABLED or interaction_mode != "voice",
+                interaction_mode = interaction_mode_for_source(tp.source)
+                runtime_context = turn_context(tp.session_id, tp.tool_access, tp.extra_context)
+                background = request_uses_background(
+                    tp.command, tp.source, tp.requested_mode, tp.tool_access
                 )
-                decision = _enforce_foreground_for_sensitive_actions(tp.command, decision)
-                restricted = tp.tool_access != "full"
                 # A typed command is presence evidence too, just a weaker one:
                 # it proves someone is at a keyboard, not that they are in the
                 # room, so it is reported with its own modality.
@@ -393,49 +403,21 @@ def router_loop(central_queue: queue.Queue, display_sink, stop_signal: Optional[
                     session_id=tp.session_id,
                     modality="text",
                     source=tp.source,
-                    routing_mode=decision.mode,
+                    routing_mode="background" if background else "foreground",
                 )
                 try:
-                    if decision.mode == "status":
-                        response_text = _run_agent_command(
-                            tp.command,
-                            display_sink,
-                            snapshot,
-                            session_id=tp.session_id,
-                            interaction_mode=interaction_mode,
-                            extra_context=runtime_context,
-                            tool_access=tp.tool_access,
-                        )
-                        if tp.reply_queue is not None:
-                            tp.reply_queue.put(
-                                {
-                                    "ok": True,
-                                    "mode": "foreground",
-                                    "response": response_text,
-                                    "session_id": tp.session_id,
-                                    "source": tp.source,
-                                }
-                            )
-                        continue
-
-                    # Background jobs run with full tool access, so a
-                    # restricted caller's turn always stays in the foreground.
-                    if decision.mode == "background" and not restricted:
+                    if background:
                         job = job_manager.submit(
                             session_id=tp.session_id,
                             source=tp.source,
                             request_text=tp.command,
                             state_snapshot=snapshot,
                             interaction_mode=interaction_mode,
-                            classification_reason=decision.reason,
+                            classification_reason="explicit background request",
                         )
                         if tp.reply_queue is not None:
                             tp.reply_queue.put(
-                                _job_response(
-                                    job,
-                                    source=tp.source,
-                                    response_text=decision.response,
-                                )
+                                _job_response(job, source=tp.source)
                             )
                         continue
 
@@ -447,6 +429,8 @@ def router_loop(central_queue: queue.Queue, display_sink, stop_signal: Optional[
                         interaction_mode=interaction_mode,
                         extra_context=runtime_context,
                         tool_access=tp.tool_access,
+                        legacy=legacy,
+                        request_id=tp.request_id,
                     )
                     if tp.reply_queue is not None:
                         tp.reply_queue.put(

@@ -7,6 +7,7 @@ import queue
 import threading
 import time
 import uuid
+from collections import OrderedDict
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -15,9 +16,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from butler.agent import runtime as agent_runtime
 from butler.agent import tool_access
+from butler.agent.conversation import resolve_session, voice_session_id
 from butler.config import env_bool, load_environment
 from butler.jobs import get_default_job_store
 from butler.messages import AnnouncementPayload, EventPayload, Message, TextPayload
+from butler.router import interaction_mode_for_source, request_uses_background, turn_context
 from butler.mcp_client import peek_local_mcp_status
 from butler.services import awareness_client, awareness_signals, sleep_mode
 from butler.telemetry import emit_pipeline_event
@@ -50,6 +53,13 @@ def _stream_state_snapshot(body: dict[str, Any]) -> str:
     """Resolve the same awareness snapshot used by routed agent requests."""
     legacy_snapshot = str(body.get("state_snapshot") or "no recent status")
     return awareness_client.snapshot_with_fallback(legacy_snapshot)
+
+
+def _request_identity(body: dict[str, Any], client_ip: str) -> tuple[str, str]:
+    source = str(body.get("source") or "http").strip().lower() or "http"
+    default_session = voice_session_id() if source == "voice" else f"text:{client_ip}"
+    session_id = str(body.get("session_id") or default_session).strip() or default_session
+    return source, session_id
 
 
 @dataclass(frozen=True)
@@ -108,6 +118,20 @@ class TextAgentHTTPServer(ThreadingHTTPServer):
         self.central_queue = central_queue
         self.config = config
         self.display_state = display_state
+        self._accepted_requests: OrderedDict[tuple[str, str, str], None] = OrderedDict()
+        self._accepted_requests_lock = threading.Lock()
+
+    def claim_request(self, source: str, session_id: str, request_id: str) -> bool:
+        if not request_id:
+            return True
+        key = (source, session_id, request_id)
+        with self._accepted_requests_lock:
+            if key in self._accepted_requests:
+                return False
+            self._accepted_requests[key] = None
+            if len(self._accepted_requests) > 1024:
+                self._accepted_requests.popitem(last=False)
+            return True
 
 
 class TextAgentRequestHandler(BaseHTTPRequestHandler):
@@ -339,7 +363,14 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
         spoken_text = str(body.get("spoken_text") or "")
 
         cancelled = agent_runtime.request_cancel(request_id) if request_id else False
-        recorded = agent_runtime.note_interruption(session_id, spoken_text)
+        if request_id:
+            access = self._request_tool_access(body, "voice")
+            resolved = self._turn_session(session_id, "voice", access)
+            recorded = agent_runtime.note_interruption(
+                resolved, spoken_text, request_id=request_id
+            )
+        else:
+            recorded = agent_runtime.note_interruption(session_id, spoken_text)
         print(
             f"[text-agent] interrupted session={session_id} request={request_id or '-'} "
             f"cancelled={cancelled} recorded={recorded}"
@@ -454,10 +485,14 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             self._write_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "Missing 'message'."})
             return
 
-        session_id = str(body.get("session_id") or f"text:{self.client_address[0]}").strip()
-        source = str(body.get("source") or "http").strip()
+        source, session_id = _request_identity(body, self.client_address[0])
         requested_mode = _requested_mode_from_body(body)
         access = self._request_tool_access(body, source)
+        session_id = self._turn_session(session_id, source, access)
+        request_id = str(body.get("request_id") or uuid.uuid4().hex)[:100]
+        if not self.server.claim_request(source, session_id, request_id):
+            self._write_json(HTTPStatus.CONFLICT, {"ok": False, "error": "Request already accepted."})
+            return
 
         # Applies the state change now; the model still phrases the reply.
         sleep_note = self._sleep_phrase_note(command, source, access)
@@ -467,6 +502,20 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             # to the background lane and answer "I'm working on it now."
             requested_mode = "foreground"
 
+        result = self._collect_turn(command, session_id, source, requested_mode, sleep_note, access, request_id)
+        if result is None:
+            self._write_json(
+                HTTPStatus.GATEWAY_TIMEOUT,
+                {"ok": False, "error": "Agent request timed out.", "session_id": session_id},
+            )
+            return
+        status = HTTPStatus.OK if result.get("ok") else HTTPStatus.INTERNAL_SERVER_ERROR
+        self._write_json(status, result)
+
+    def _collect_turn(
+        self, command: str, session_id: str, source: str, requested_mode: str,
+        extra_context: str | None, access: str, request_id: str,
+    ) -> dict[str, Any] | None:
         reply_queue: queue.Queue = queue.Queue(maxsize=1)
         self.server.central_queue.put(
             Message(
@@ -477,8 +526,9 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
                     source=source,
                     reply_queue=reply_queue,
                     requested_mode=requested_mode,
-                    extra_context=sleep_note,
+                    extra_context=extra_context,
                     tool_access=access,
+                    request_id=request_id,
                 ),
             )
         )
@@ -489,27 +539,16 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             wait_timeout = None if terminal_timeout <= 0 else terminal_timeout
 
         try:
-            if wait_timeout is None:
-                result = reply_queue.get()
-            else:
-                result = reply_queue.get(timeout=wait_timeout)
+            return reply_queue.get(timeout=wait_timeout)
         except queue.Empty:
-            self._write_json(
-                HTTPStatus.GATEWAY_TIMEOUT,
-                {"ok": False, "error": "Agent request timed out.", "session_id": session_id},
-            )
-            return
-
-        status = HTTPStatus.OK if result.get("ok") else HTTPStatus.INTERNAL_SERVER_ERROR
-        self._write_json(status, result)
+            return None
 
     def _handle_chat_stream(self) -> None:
-        """Foreground streaming turn as Server-Sent Events.
+        """Deliver a foreground turn as Server-Sent Events.
 
         Emits ``{"type": "delta", "text": ...}`` events as the model generates,
         then a terminal ``{"type": "done", "text": <full>}`` (or ``"error"``).
-        Runs the agent directly in the foreground lane (bypassing the background
-        job machinery) so the latency-sensitive voice path streams end to end.
+        Uses the same turn engine as collected replies.
         """
         try:
             body = self._read_json_body()
@@ -524,19 +563,33 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             self._write_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "Missing 'message'."})
             return
 
-        session_id = str(body.get("session_id") or "voice").strip() or "voice"
-        source = str(body.get("source") or "voice").strip()
+        source, session_id = _request_identity(body, self.client_address[0])
         access = self._request_tool_access(body, source)
+        session_id = self._turn_session(session_id, source, access)
+        if not self.server.claim_request(source, session_id, request_id):
+            self._write_json(HTTPStatus.CONFLICT, {"ok": False, "error": "Request already accepted."})
+            return
 
         # Applies the state change now, before the model runs, so the panel
         # dims without waiting on generation; the model still says the words.
         sleep_note = self._sleep_phrase_note(command, source, access)
+        requested_mode = "foreground" if sleep_note else _requested_mode_from_body(body)
 
         snapshot_started = time.perf_counter()
         snapshot = _stream_state_snapshot(body)
         awareness_snapshot_ms = round(
             (time.perf_counter() - snapshot_started) * 1000.0, 1
         )
+
+        disconnected = False
+
+        def send_event(event: dict[str, Any]) -> None:
+            nonlocal disconnected
+            if not disconnected:
+                try:
+                    self._send_sse(event)
+                except (BrokenPipeError, ConnectionResetError):
+                    disconnected = True
 
         try:
             self.send_response(HTTPStatus.OK)
@@ -545,7 +598,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
         except (BrokenPipeError, ConnectionResetError):
-            return
+            disconnected = True
 
         full_parts: list[str] = []
         # Registered before the first delta so a barge-in arriving early in the
@@ -553,7 +606,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
         cancel_token = agent_runtime.register_cancel(request_id)
 
         def send_telemetry(payload: dict[str, Any]) -> None:
-            self._send_sse(
+            send_event(
                 {
                     "type": "telemetry",
                     "request_id": request_id,
@@ -573,13 +626,25 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
                 **snapshot_event,
             )
             send_telemetry(snapshot_event)
+            if request_uses_background(command, source, requested_mode, access):
+                result = self._collect_turn(
+                    command, session_id, source, requested_mode, sleep_note, access, request_id
+                )
+                if result is None:
+                    raise RuntimeError("Agent request timed out.")
+                if not result.get("ok"):
+                    raise RuntimeError(str(result["error"]))
+                text = str(result["response"])
+                send_event({"type": "delta", "text": text})
+                send_event({"type": "done", "text": text, "mode": "background", "job_id": result["job_id"]})
+                return
             for delta in agent_runtime.run_command_stream(
                 command,
                 snapshot,
                 session_id=session_id,
-                interaction_mode="voice",
+                interaction_mode=interaction_mode_for_source(source),
                 runtime_lane="foreground",
-                extra_context=sleep_note,
+                extra_context=turn_context(session_id, access, sleep_note),
                 request_id=request_id,
                 telemetry_callback=send_telemetry,
                 cancel=cancel_token,
@@ -588,7 +653,9 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
                 if not delta:
                     continue
                 full_parts.append(delta)
-                self._send_sse({"type": "delta", "text": delta})
+                send_event({"type": "delta", "text": delta})
+            if not "".join(full_parts).strip() and not cancel_token.is_set():
+                raise RuntimeError("The turn ended without a reply.")
             request_total_ms = round(
                 (time.perf_counter() - request_started) * 1000.0, 1
             )
@@ -603,7 +670,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
                 **completed_event,
             )
             send_telemetry(completed_event)
-            self._send_sse({"type": "done", "text": "".join(full_parts).strip()})
+            send_event({"type": "done", "text": "".join(full_parts).strip()})
         except (BrokenPipeError, ConnectionResetError):
             print("[text-agent] stream client disconnected")
         except Exception as exc:  # noqa: BLE001 - report to client then end stream
@@ -618,7 +685,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
                 ),
                 error_type=type(exc).__name__,
             )
-            self._send_sse({"type": "error", "error": str(exc)})
+            send_event({"type": "error", "error": str(exc)})
         finally:
             agent_runtime.release_cancel(request_id)
             # The streaming lane runs the agent directly instead of going through
@@ -628,6 +695,20 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             # still show whatever was said and heard.
             self._publish_turn_banner(command, "".join(full_parts).strip())
 
+    def _turn_session(self, session_id: str, source: str, access: str) -> str:
+        local = self._is_loopback()
+        # The normal ReSpeaker conversation is shared. Boot and proactive
+        # speech use their own sessions.
+        voice = source == "voice" and local and session_id in {"voice", voice_session_id()}
+        owner = access == tool_access.FULL and (voice or source != "voice")
+        return resolve_session(f"{source}:{session_id}", owner=owner)
+
+    def _is_loopback(self) -> bool:
+        address = ipaddress.ip_address(self.client_address[0])
+        return address.is_loopback or bool(
+            getattr(address, "ipv4_mapped", None) and address.ipv4_mapped.is_loopback
+        )
+
     def _request_tool_access(self, body: dict[str, Any], source: str) -> str:
         """Tool access for this request; see :mod:`butler.agent.tool_access`."""
         access = tool_access.resolve_request_access(
@@ -635,6 +716,8 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             body.get("tool_access"),
             self.headers.get(tool_access.PRIVILEGE_HEADER),
         )
+        if not self._is_loopback() and (source == "voice" or not self.server.config.api_token):
+            access = tool_access.RESTRICTED
         if access != tool_access.FULL:
             print(f"[text-agent] restricted tool access for source={source!r}")
         return access
@@ -749,8 +832,14 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             self._write_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "Missing 'session_id'."})
             return
 
-        agent_runtime.reset_session(session_id)
-        self._write_json(HTTPStatus.OK, {"ok": True, "session_id": session_id})
+        source, _ = _request_identity(body, self.client_address[0])
+        access = self._request_tool_access(body, source)
+        if access != tool_access.FULL:
+            self._write_json(HTTPStatus.FORBIDDEN, {"ok": False, "error": "Session reset requires full access."})
+            return
+        resolved = self._turn_session(session_id, source, access)
+        agent_runtime.reset_session(resolved)
+        self._write_json(HTTPStatus.OK, {"ok": True, "session_id": resolved})
 
     def _handle_phone_event(self) -> None:
         expected_token = self.server.config.phone_push_token

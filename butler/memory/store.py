@@ -155,7 +155,9 @@ class MemoryStore:
             )
         self.refresh_session_summary(session_id)
 
-    def amend_last_assistant_message(self, session_id: str, content: str) -> bool:
+    def amend_last_assistant_message(
+        self, session_id: str, content: str, *, request_id: str | None = None
+    ) -> bool:
         """Replace the newest assistant turn's text, or add one if it is missing.
 
         Used when a reply turns out to be shorter than what was recorded -- a
@@ -174,10 +176,11 @@ class MemoryStore:
                 SELECT id, role
                 FROM messages
                 WHERE session_id = ? AND role IN ('user', 'assistant')
+                  AND (? IS NULL OR json_extract(metadata_json, '$.request_id') = ?)
                 ORDER BY id DESC
                 LIMIT 1
                 """,
-                (session_id,),
+                (session_id, request_id, request_id),
             ).fetchone()
             if row is None:
                 return False
@@ -187,12 +190,17 @@ class MemoryStore:
                     (content, int(row["id"])),
                 )
                 self._conn.commit()
-                amended = True
             else:
-                amended = False
-
-        if not amended:
-            self.record_message(session_id, "assistant", content)
+                # Insert only if the targeted user entry is still the latest.
+                # A late interrupt must never append text to a newer exchange.
+                if request_id and self._conn.execute(
+                    "SELECT MAX(id) FROM messages WHERE session_id = ?", (session_id,)
+                ).fetchone()[0] != row["id"]:
+                    return False
+                self.record_message(
+                    session_id, "assistant", content,
+                    metadata={"request_id": request_id} if request_id else None,
+                )
         self.refresh_session_summary(session_id)
         return True
 

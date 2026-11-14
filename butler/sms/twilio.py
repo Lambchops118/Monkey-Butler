@@ -38,6 +38,7 @@ class SmsConfig:
     reply_timeout: float
     job_follow_up_timeout: float
     max_reply_chars: int
+    owner_sender: str = ""
 
     @classmethod
     def from_env(cls) -> "SmsConfig":
@@ -54,6 +55,7 @@ class SmsConfig:
             reply_timeout=float(os.getenv("BUTLER_SMS_REPLY_TIMEOUT", "300")),
             job_follow_up_timeout=float(os.getenv("BUTLER_SMS_JOB_FOLLOW_UP_TIMEOUT", "1800")),
             max_reply_chars=min(TWILIO_MAX_BODY_CHARS, max(160, env_int("BUTLER_SMS_MAX_REPLY_CHARS", 1500))),
+            owner_sender=os.getenv("BUTLER_SMS_OWNER_SENDER", "").strip(),
         )
 
     def missing_requirements(self) -> list[str]:

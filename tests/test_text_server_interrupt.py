@@ -95,7 +95,7 @@ class InterruptEndpointTest(unittest.TestCase):
         self.assertTrue(body["cancelled"])
         self.assertTrue(body["recorded"])
         self.assertTrue(token.is_set())
-        note.assert_called_once_with("voice-worker", "Channel one is primed.")
+        note.assert_called_once_with("owner", "Channel one is primed.", request_id="req-abc")
 
     def test_a_reply_that_already_finished_generating_is_still_corrected(self) -> None:
         """The common case: the model finished long before the audio did."""

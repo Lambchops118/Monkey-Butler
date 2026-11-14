@@ -42,6 +42,8 @@ class TextPayload:
     # "full" or "restricted" (see butler.agent.tool_access). Restricted turns
     # see only allowlisted tools and never go to the background job lane.
     tool_access: str = "full"
+    request_id: str | None = None
+    legacy_phone: bool = False
 
 @dataclass
 class EventPayload:

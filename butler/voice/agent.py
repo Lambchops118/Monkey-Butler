@@ -90,7 +90,6 @@ REMOTE_STT_FALLBACK_ENABLED = env_bool("BUTLER_REMOTE_STT_FALLBACK", False)
 # The legacy voice command path calls the non-streaming hosted Responses lane.
 # Keep that failover opt-in so an Ollama outage cannot silently move inference
 # off the machine.
-REMOTE_LLM_FALLBACK_ENABLED = env_bool("BUTLER_REMOTE_LLM_FALLBACK", False)
 # The LLM's GPU idles down within ~10 s, and the clock ramp is otherwise paid by
 # the next turn. Transcription gives us a few hundred milliseconds of cover to
 # absorb it, so the agent is nudged awake as soon as there is speech worth
@@ -1803,31 +1802,15 @@ def handle_command(command, benchmark=None, session_id=None):
                         "streaming_path_failed",
                         error_type=type(exc).__name__,
                     )
-                if progress["spoke"]:
-                    # Audio already started; do not replay via the fallback path.
-                    if benchmark:
-                        benchmark.emit_summary_once("voice_worker_error")
-                        benchmark.mark_stage("pipeline_done")
-                        _emit_voice_pipeline_event(
-                            benchmark,
-                            "voice_pipeline_failed",
-                            error_type=type(exc).__name__,
-                        )
-                    return
-                if not REMOTE_LLM_FALLBACK_ENABLED:
-                    print("Remote LLM fallback is disabled; voice command failed locally.")
-                    if benchmark:
-                        benchmark.emit_summary_once("voice_worker_error")
-                        benchmark.mark_stage("pipeline_done")
-                        _emit_voice_pipeline_event(
-                            benchmark,
-                            "voice_pipeline_failed",
-                            error_type=type(exc).__name__,
-                        )
-                    return
-                print("Falling back to explicitly enabled non-streaming voice path.")
                 if benchmark:
-                    benchmark.set_dimension("llm_fallback_used", True)
+                    benchmark.emit_summary_once("voice_worker_error")
+                    benchmark.mark_stage("pipeline_done")
+                    _emit_voice_pipeline_event(
+                        benchmark,
+                        "voice_pipeline_failed",
+                        error_type=type(exc).__name__,
+                    )
+                return
         _handle_command_legacy(command, benchmark, session_id)
     finally:
         # Guarantee the command is recorded exactly once. emit_summary_once is

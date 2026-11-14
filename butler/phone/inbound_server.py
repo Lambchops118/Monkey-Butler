@@ -389,6 +389,7 @@ def _ask_main_agent(server: PhoneInboundServer, caller: str, request: str) -> di
                 command=request,
                 session_id=phone_session_id(caller),
                 source="phone",
+                legacy_phone=True,
                 reply_queue=reply_queue,
                 requested_mode="foreground",
                 extra_context=PHONE_TURN_CONTEXT,

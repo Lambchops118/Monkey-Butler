@@ -63,11 +63,24 @@ class RunCommandStreamTests(unittest.TestCase):
                 stack.enter_context(mock.patch.object(agent_runtime, name, return_value=value))
             stack.enter_context(mock.patch.object(agent_runtime, "TOOLS_DISABLED", False))
             stack.enter_context(mock.patch.object(agent_runtime, "emit_pipeline_event"))
-            list(agent_runtime.run_command_stream("Read the recipe screen", session_id="test-tools"))
+            self.assertEqual(
+                agent_runtime.collect_command(
+                    "Read the recipe screen",
+                    "no recent status",
+                    session_id="test-tools",
+                    interaction_mode="text",
+                    runtime_lane="foreground",
+                    extra_context=None,
+                    tool_access="full",
+                ),
+                "There are two items.",
+            )
             # Change the live schema; historical snapshots must not replace it.
             current = {**schema, "description": "Current provider version"}
             mcp.openai_tool_definitions = lambda: [current]
-            list(agent_runtime.run_command_stream("Remove the second one", session_id="test-tools"))
+            list(agent_runtime.run_command_stream(
+                "Remove the second one", session_id="test-tools", interaction_mode="voice"
+            ))
         history = backend.stream_calls[-1]
         calls = [m for m in history if m.get("tool_calls")]
         results = [m for m in history if m["role"] == "tool"]

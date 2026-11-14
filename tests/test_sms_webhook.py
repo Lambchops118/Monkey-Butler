@@ -153,7 +153,7 @@ class WebhookTests(unittest.TestCase):
         payload = message.payload
         self.assertEqual(message.type, "text_cmd")
         self.assertEqual(payload.command, "water the plants")
-        self.assertEqual(payload.session_id, f"sms:{OWNER}")
+        self.assertEqual(payload.session_id, "owner")
         self.assertEqual(payload.source, "sms")
         self.assertEqual(payload.extra_context, SMS_TURN_CONTEXT)
         payload.reply_queue.put({"ok": True, "mode": "foreground", "response": "Watered pot 1."})

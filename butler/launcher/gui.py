@@ -208,15 +208,6 @@ class LauncherGUI:
         )
         self.think_box.grid(row=4, column=1, sticky="we", padx=4, pady=2)
 
-        # Off = a failing local model surfaces as an error instead of quietly
-        # answering with the hosted OpenAI model.
-        self.var_remote_fallback = tk.BooleanVar()
-        self.remote_fallback_box = ttk.Checkbutton(
-            llm,
-            text="Silently fall back to OpenAI if the local model fails",
-            variable=self.var_remote_fallback,
-        )
-        self.remote_fallback_box.grid(row=5, column=0, columnspan=2, sticky="w", pady=(4, 0))
         llm.columnconfigure(1, weight=1)
 
         # --- Awareness / MQTT --------------------------------------------
@@ -537,7 +528,6 @@ class LauncherGUI:
         self.var_use_api.set(self.cfg.use_api_models)
         self.var_api_model.set(self.cfg.api_llm_model)
         self.var_think.set(self._think_label_for(config.get_setting("BUTLER_LLM_THINK_MODE")))
-        self.var_remote_fallback.set(config.setting_bool("BUTLER_REMOTE_LLM_FALLBACK", False))
         self.var_mqtt.set(config.setting_bool("BUTLER_AWARENESS_MQTT_ENABLED", True))
         self.var_mqtt_host.set(config.get_setting("BUTLER_AWARENESS_MQTT_HOST"))
         self.var_mqtt_port.set(config.get_setting("BUTLER_AWARENESS_MQTT_PORT"))
@@ -601,9 +591,6 @@ class LauncherGUI:
         config.set_setting("BUTLER_LLM_MODEL", self.var_model.get().strip())
         config.set_setting("BUTLER_LLM_BASE_URL", self.var_base_url.get().strip())
         config.set_setting("BUTLER_LLM_THINK_MODE", self._think_value_from(self.var_think.get()))
-        config.set_setting(
-            "BUTLER_REMOTE_LLM_FALLBACK", "1" if self.var_remote_fallback.get() else "0"
-        )
         config.set_setting("BUTLER_AWARENESS_MQTT_ENABLED", "1" if self.var_mqtt.get() else "0")
         config.set_setting("BUTLER_AWARENESS_MQTT_HOST", self.var_mqtt_host.get().strip())
         config.set_setting("BUTLER_AWARENESS_MQTT_PORT", self.var_mqtt_port.get().strip())
@@ -658,8 +645,6 @@ class LauncherGUI:
         self.api_model_box.configure(state=api_state)
         # Hosted models ignore the Qwen think switches; the launcher forces "off".
         self.think_box.configure(state="disabled" if api else "readonly")
-        # API mode always enables the fallback for that run, so the box is moot.
-        self.remote_fallback_box.configure(state="disabled" if api else "normal")
         if api and not config.has_secret("OPENAI_API_KEY"):
             self._append_log(
                 "launcher",

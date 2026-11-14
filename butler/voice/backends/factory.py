@@ -22,6 +22,8 @@ their concrete implementations.
 from __future__ import annotations
 
 import os
+import ipaddress
+from urllib.parse import urlsplit
 
 from butler.config import env_bool, env_float, env_int, load_environment
 from butler.voice.backends.base import LLMBackend, STTBackend
@@ -42,6 +44,15 @@ def get_llm_backend() -> LLMBackend:
         base_url = os.getenv("BUTLER_LLM_BASE_URL", "").strip() or None
         if backend == "ollama" and base_url is None:
             base_url = "http://127.0.0.1:11434/v1"
+        if not env_bool("BUTLER_HOSTED_DEBUG", False):
+            host = urlsplit(base_url or "").hostname or ""
+            try:
+                address = ipaddress.ip_address(host)
+                local = address.is_loopback or address.is_private or address in ipaddress.ip_network("100.64.0.0/10")
+            except ValueError:
+                local = host == "localhost" or host.endswith((".local", ".ts.net"))
+            if not local:
+                raise RuntimeError("Local mode requires a local LLM endpoint.")
         max_tokens_param = os.getenv("BUTLER_LLM_MAX_TOKENS_PARAM", "").strip()
         if not max_tokens_param:
             is_openai = base_url is None or "openai.com" in base_url

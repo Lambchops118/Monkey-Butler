@@ -143,7 +143,7 @@ def _api_model_env(base: dict[str, str], api_model: str) -> dict[str, str]:
     # STT deliberately stays local (faster-whisper, settings.env): the hosted
     # path gates every clip on a CPU openai-whisper "base" wake check before
     # whisper-1, which missed the wake word far more often than local STT.
-    env["BUTLER_REMOTE_LLM_FALLBACK"] = "1"
+    env["BUTLER_HOSTED_DEBUG"] = "1"
     # Hosted OpenAI uses max_completion_tokens (the factory also infers this from
     # the openai.com base URL, but set it explicitly to be safe).
     env["BUTLER_LLM_MAX_TOKENS_PARAM"] = "max_completion_tokens"
@@ -514,7 +514,7 @@ class Supervisor:
         # Env shared by both child processes. Point the frontend at the local
         # main agent when we started it; default it to the Butler brain backend.
         discord_env = dict(base)
-        discord_env.setdefault("LLM_PROVIDER", "butler")
+        discord_env["LLM_PROVIDER"] = "butler"
         if self._cfg.start_main:
             local_url = f"http://127.0.0.1:{self._ports.text_agent}"
             discord_env["BUTLER_TEXT_AGENT_URL"] = local_url
