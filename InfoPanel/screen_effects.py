@@ -1,6 +1,7 @@
 
 import math
 import random
+import sys
 import numpy as np
 import pygame, moderngl
 from pygame.locals import DOUBLEBUF, OPENGL
@@ -261,7 +262,7 @@ def warp_crt(src_surf):
 # ================GPU BARREL WARP ===========================================
 class GpuCRT:
     def __init__(self, window_size=(GAME_W, GAME_H),
-                 kx=1, ky=1, scan=1, vign=10, gamma=20.0, curv=1):
+                 kx=1, ky=1, scan=1, vign=10, gamma=20.0, curv=1, extra_flags=0):
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
         pygame.display.gl_set_attribute(
@@ -269,11 +270,16 @@ class GpuCRT:
             pygame.GL_CONTEXT_PROFILE_CORE,
         )
         # Pygame GL window
-        pygame.display.set_mode(window_size, DOUBLEBUF | OPENGL)
+        pygame.display.set_mode(window_size, DOUBLEBUF | OPENGL | extra_flags)
         self.w, self.h = window_size
 
         # ModernGL context
-        self.ctx = moderngl.create_context(require=330)
+        # Linux ships only the versioned libGL.so.1 without dev packages;
+        # moderngl's default lookup asks for the unversioned libGL.so.
+        if sys.platform.startswith("linux"):
+            self.ctx = moderngl.create_context(require=330, libgl="libGL.so.1")
+        else:
+            self.ctx = moderngl.create_context(require=330)
         self.ctx.enable(moderngl.BLEND)
 
         # Program

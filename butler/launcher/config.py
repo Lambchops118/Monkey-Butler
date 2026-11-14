@@ -29,6 +29,10 @@ from butler.voice.microphone_profiles import (
     DEFAULT_MICROPHONE_PROFILE,
     normalize_microphone_profile,
 )
+from butler.voice.speaker_outputs import (
+    DEFAULT_SPEAKER_OUTPUT,
+    normalize_speaker_output,
+)
 
 
 # butler/launcher/config.py -> repo root is two parents up.
@@ -48,9 +52,9 @@ VENV_DIRS = {
 
 # Requirements manifest each dedicated venv is built from (for setup hints).
 VENV_REQUIREMENTS = {
-    ".venv-runtime": "requirements-runtime-py312.txt",
-    ".venv-display": "requirements-display-py312.txt",
-    ".venv-awareness": "requirements-awareness-py312.txt",
+    ".venv-runtime": "requirements/runtime-py312.txt",
+    ".venv-display": "requirements/display-py312.txt",
+    ".venv-awareness": "requirements/awareness-py312.txt",
 }
 
 # Fallback ("legacy") venv used only for components without a dedicated venv.
@@ -490,6 +494,11 @@ class LauncherConfig:
     start_voice: bool = True
     start_display: bool = True
     microphone_profile: str = DEFAULT_MICROPHONE_PROFILE
+    # Where Butler's voice plays. "respeaker" drives the XVF3800's JST speaker,
+    # which the chip echo-cancels on-chip so barge-in works without host AEC.
+    speaker_output: str = DEFAULT_SPEAKER_OUTPUT
+    # ReSpeaker playback volume (0-100 %), applied with amixer on save/start.
+    speaker_volume: int = 100
 
     # Discord voice frontend (separate repo). Off by default: it is an optional
     # external client that reaches the main agent over BUTLER_TEXT_AGENT_URL, and
@@ -549,6 +558,8 @@ class LauncherConfig:
             cfg.microphone_profile = normalize_microphone_profile(
                 cfg.microphone_profile
             )
+            cfg.speaker_output = normalize_speaker_output(cfg.speaker_output)
+            cfg.speaker_volume = clamp_volume(cfg.speaker_volume)
         else:
             # First run: seed GPU choices from detected hardware.
             gpus = detect_gpus()
@@ -558,6 +569,95 @@ class LauncherConfig:
 
     def save(self) -> None:
         LAUNCHER_CONFIG_PATH.write_text(self.to_json() + "\n", encoding="utf-8")
+
+
+RESPEAKER_ALSA_CARD = "Array"
+
+
+def clamp_volume(value: object) -> int:
+    try:
+        return max(0, min(100, int(float(str(value).strip()))))
+    except (TypeError, ValueError):
+        return 100
+
+
+def apply_speaker_volume(percent: int) -> str:
+    """Set the ReSpeaker's PCM playback volume. Returns an error string, or ""."""
+
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["amixer", "-c", RESPEAKER_ALSA_CARD, "sset", "PCM", f"{clamp_volume(percent)}%"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return str(exc)
+    return "" if result.returncode == 0 else (result.stderr.strip() or "amixer failed")
+
+
+def play_test_tone(frequency: float = 440.0, seconds: float = 0.6) -> str:
+    """Play a sine tone on the ReSpeaker. Returns an error string, or ""."""
+
+    import io
+    import math
+    import struct
+    import subprocess
+    import wave
+
+    rate = 48000
+    count = int(rate * seconds)
+    fade = int(rate * 0.02)
+    frames = bytearray()
+    for i in range(count):
+        envelope = min(1.0, i / fade, (count - i) / fade)
+        sample = int(0.5 * 32767 * envelope * math.sin(2 * math.pi * frequency * i / rate))
+        frames += struct.pack("<hh", sample, sample)
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(2)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        wav.writeframes(bytes(frames))
+    import re
+    import tempfile
+
+    # PipeWire usually holds the ALSA device open, so play through it when it
+    # is running; fall back to raw ALSA otherwise.
+    commands = []
+    try:
+        nodes = subprocess.run(
+            ["pw-cli", "ls", "Node"], capture_output=True, text=True, timeout=5
+        ).stdout
+        target = next(
+            (n for n in re.findall(r'node\.name = "([^"]+)"', nodes)
+             if n.startswith("alsa_output.") and "respeaker" in n.lower()),
+            "",
+        )
+        if target:
+            commands.append(["pw-play", "--target", target])
+    except (OSError, subprocess.SubprocessError):
+        pass
+    commands.append(["aplay", "-q", "-D", f"plughw:CARD={RESPEAKER_ALSA_CARD},DEV=0"])
+
+    with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+        tmp.write(buffer.getvalue())
+        tmp.flush()
+        error = "no player available"
+        for command in commands:
+            try:
+                result = subprocess.run(
+                    command + [tmp.name], capture_output=True, text=True, timeout=10
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                error = str(exc)
+                continue
+            if result.returncode == 0:
+                return ""
+            error = result.stderr.strip() or f"{command[0]} failed"
+        return error
 
 
 @dataclass

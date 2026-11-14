@@ -12,6 +12,7 @@ import sys
 
 from .config import LauncherConfig
 from butler.voice.microphone_profiles import MICROPHONE_PROFILES
+from butler.voice.speaker_outputs import SPEAKER_OUTPUTS
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -36,6 +37,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--microphone",
         choices=tuple(MICROPHONE_PROFILES),
         help="Room microphone profile for this headless run (yeti or respeaker).",
+    )
+    parser.add_argument(
+        "--speaker",
+        choices=tuple(SPEAKER_OUTPUTS),
+        help="Speaker output for this headless run (system or respeaker JST speaker).",
     )
     parser.add_argument(
         "--api-models",
@@ -151,6 +157,8 @@ def main(argv: list[str] | None = None) -> int:
         cfg.start_display = False
     if args.microphone:
         cfg.microphone_profile = args.microphone
+    if args.speaker:
+        cfg.speaker_output = args.speaker
     if args.api_models:
         cfg.use_api_models = True
     if args.disable_mcp:

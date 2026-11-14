@@ -1898,7 +1898,7 @@ def _collect_mcp_server_configs() -> list[McpServerConfig]:
             McpServerConfig(
                 name=name,
                 transport=transport,
-                command=_optional_str(item.get("command")),
+                command=_resolve_command(_optional_str(item.get("command"))),
                 args=[str(arg) for arg in args],
                 url=_optional_str(item.get("url")),
                 headers={str(key): str(value) for key, value in headers.items()},
@@ -1945,6 +1945,22 @@ def _collect_mcp_server_configs() -> list[McpServerConfig]:
         seen_names.add(config.name)
 
     return configs
+
+
+_BARE_PYTHON_COMMANDS = {"python", "python3", "python.exe", "python3.exe"}
+
+
+def _resolve_command(command: str | None) -> str | None:
+    """Run a bare ``python`` server on Butler's own interpreter.
+
+    A plain ``python`` is resolved through PATH, which can pick an interpreter
+    without Butler's dependencies (e.g. a uv-managed Python), so tools then
+    fail on import. Explicit paths are left alone.
+    """
+
+    if command and command.strip().lower() in _BARE_PYTHON_COMMANDS:
+        return sys.executable
+    return command
 
 
 def _optional_str(value: Any) -> str | None:

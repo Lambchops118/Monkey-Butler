@@ -1,4 +1,5 @@
 
+import os
 import sys
 import time
 import queue
@@ -48,8 +49,18 @@ def parse_base_resolution():
         print(f"Unknown resolution '{arg}'. Falling back to QHD.")
         return RESOLUTIONS["QHD"]
 
-def draw_monkey_butler_head(screen, base_x, base_y, scale_x, scale_y, color_):
-    MBVectorArt.draw_monkey_butler_head(screen, base_x, base_y, scale_x, scale_y, color_)
+def draw_monkey_butler_head(
+    screen, base_x, base_y, scale_x, scale_y, color_, animation_time=0.0
+):
+    MBVectorArt.draw_monkey_butler_head(
+        screen,
+        base_x,
+        base_y,
+        scale_x,
+        scale_y,
+        color_,
+        animation_time=animation_time,
+    )
 
 _font_cache = {}
 
@@ -98,6 +109,11 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
 
     display_w, display_h = info.current_w, info.current_h
     screen_width, screen_height = choose_window_size(display_w, display_h)
+    # Opt-in fullscreen (BUTLER_DISPLAY_FULLSCREEN=1) at the native resolution.
+    fullscreen = os.getenv("BUTLER_DISPLAY_FULLSCREEN", "0").strip().lower() in ("1", "true", "yes", "on")
+    window_flags = pygame.FULLSCREEN if fullscreen else 0
+    if fullscreen:
+        screen_width, screen_height = display_w, display_h
 
     #w = screen_width
     #h = screen_height
@@ -117,13 +133,15 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
     try:
         crt = GpuCRT(window_size=(screen_width, screen_height),
                kx=0.18, ky=0.16, curv=0.3,
-               scan=0.18, vign=0.45, gamma=2.0)
+               scan=0.18, vign=0.45, gamma=2.0,
+               extra_flags=window_flags)
         print("GPU CRT effect enabled.")
     except Exception as exc:
         print(f"GPU CRT unavailable, falling back to standard Pygame rendering: {exc}")
-        screen = pygame.display.set_mode((screen_width, screen_height))
+        screen = pygame.display.set_mode((screen_width, screen_height), window_flags)
 
     pygame.display.set_caption("Monkey Butler")
+    pygame.mouse.set_visible(False)
 
     scale_x = screen_width / base_w
     scale_y = screen_height / base_h
@@ -138,6 +156,7 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
     last_command  = "\"butler, water the monstera\""
     last_response = "of course, sir. i have activated the pump for the pot with the monstera."
     remote_sleep_state = {"asleep": False, "display_level": 1.0}
+    portrait_started_at = time.monotonic()
 
 
     #========================================================================================
@@ -264,7 +283,7 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
     ]
 
 
-    #character = objl.load_obj_wire( "experiments/3d_vector_art_test/butlerv3.obj", keep_edges="feature", # try "boundary" or "all"
+    #character = objl.load_obj_wire( "prototypes/3d-vector-art/butlerv3.obj", keep_edges="feature", # try "boundary" or "all"
     #                                   feature_angle_deg=50.00, # larger -> fewer, sharper edges kept
     #                                     target_radius=0.8 )
 
@@ -325,9 +344,25 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
 
         debug = False
         if debug:
-            draw_monkey_butler_head(framebuffer, mb_base_x+200, mb_base_y+150, scale_x, scale_y, color)
+            draw_monkey_butler_head(
+                framebuffer,
+                mb_base_x + 200,
+                mb_base_y + 150,
+                scale_x,
+                scale_y,
+                color,
+                time.monotonic() - portrait_started_at,
+            )
         else:
-            draw_monkey_butler_head(framebuffer, mb_base_x, mb_base_y, scale_x, scale_y, color)
+            draw_monkey_butler_head(
+                framebuffer,
+                mb_base_x,
+                mb_base_y,
+                scale_x,
+                scale_y,
+                color,
+                time.monotonic() - portrait_started_at,
+            )
 
         #draw_text_topleft(f"Last command:  {last_command}",  75, 740, color, 36, target=framebuffer)
         #draw_text_topleft(f"Last response: {last_response}", 75, 900, color, 36, target=framebuffer)
@@ -399,7 +434,7 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
             if display_level < 1.0:
                 level = int(round(255 * display_level))
                 post.fill((level, level, level), special_flags=pygame.BLEND_MULT)
-            screen.blit(post, (0, fx.random_vertical_jitter_y(100)))
+            screen.blit(post, (0, 0))
             pygame.display.flip()
         #last_frame = post
 

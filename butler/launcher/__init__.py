@@ -1,22 +1,12 @@
-"""One-command startup for the whole Butler stack.
+# This serves to launch the entire Monkey Butler Stack:
+# - InfoPanel
+# - Voice Worker
+# - Ollama backend
+# - Postgres container
 
-Butler normally runs as several cooperating processes: main and voice share a
-runtime environment, while display and awareness use focused environments.
-The stack also includes a Postgres container and local Ollama server. Starting
-them by hand means several terminals. This package supervises all of them from
-a single entry point and pins each GPU-bound process to the right card:
-
-- the language model (Ollama) runs on the RTX 5080
-- the speech-to-text model (faster-whisper in the voice worker) runs on the
-  RTX 2060
-
-Run it with either::
-
+"""
     python -m butler.launcher            # GUI (default)
     python -m butler.launcher --no-gui   # headless, streams logs to the console
-
-or use the ``Start-Butler.ps1`` / ``butler.cmd`` bootstrap scripts at the repo
-root, which pick the correct virtual environment automatically.
 """
 
 from __future__ import annotations

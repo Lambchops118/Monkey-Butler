@@ -30,6 +30,11 @@ from butler.voice.microphone_profiles import (
     get_microphone_profile,
     normalize_microphone_profile,
 )
+from butler.voice.speaker_outputs import (
+    get_speaker_output,
+    normalize_speaker_output,
+    uses_hardware_aec,
+)
 
 LogFn = Callable[[str, str], None]
 """``log(source, message)`` — ``source`` is a short tag like ``main`` or
@@ -177,6 +182,15 @@ def _microphone_env(base: dict[str, str], cfg: LauncherConfig) -> dict[str, str]
     profile = get_microphone_profile(name)
     env["BUTLER_MICROPHONE_PROFILE"] = name
     env["BUTLER_RECOGNIZER_ENERGY_THRESHOLD"] = profile.energy_threshold
+    speaker = normalize_speaker_output(cfg.speaker_output)
+    env["BUTLER_SPEAKER_OUTPUT"] = speaker
+    if get_speaker_output(speaker).device_name_env:
+        # A named speaker must not be overridden by a stale numeric index.
+        env.pop("BUTLER_AUDIO_OUTPUT_DEVICE_INDEX", None)
+    if uses_hardware_aec(speaker, name):
+        # The XVF3800 echo-cancels its own playback on-chip; no Windows
+        # endpoint pinning is involved, so barge-in stays as configured.
+        return env
     if not profile.windows_aec:
         # A microphone may only be composed with the Windows AEC/barge-in
         # contract once its own far-end reference has been measured on this
@@ -424,6 +438,15 @@ class Supervisor:
         env = _microphone_env(env, self._cfg)
         profile = get_microphone_profile(self._cfg.microphone_profile)
         self._say(f"voice microphone profile: {profile.label}")
+        speaker = get_speaker_output(self._cfg.speaker_output)
+        self._say(f"voice speaker output: {speaker.label}")
+        if uses_hardware_aec(speaker.name, profile.name):
+            self._say("barge-in uses the ReSpeaker's on-chip echo cancellation.")
+        elif speaker.hardware_aec_microphone:
+            self._say(
+                f"{speaker.label} is only echo-cancelled by its own microphone; "
+                "pick the ReSpeaker microphone for barge-in."
+            )
         if not profile.windows_aec:
             self._say(
                 f"{profile.label}: barge-in is disabled until this "

@@ -196,3 +196,117 @@ class PortAudioChannelMicrophone(sr.AudioSource):
             stream.close()
         if audio is not None:
             audio.terminate()
+
+
+class PortAudioDeviceAecCapture:
+    """Duplex capture source for a microphone that cancels echo on-chip.
+
+    The XVF3800 removes its own USB playback from the ASR channel, so the
+    frames read here are already echo-cleaned. Fits the
+    ``DuplexAudioProcessor`` contract used by ``DuplexAudioPipeline``.
+    """
+
+    def __init__(
+        self,
+        *,
+        name_contains: str,
+        preferred_host_api: str = "",
+        sample_rate: int = 16000,
+        source_channels: int = 1,
+        selected_channel: int = 0,
+        frame_samples: int = 160,
+        pyaudio_module: Any | None = None,
+    ) -> None:
+        if not 0 <= selected_channel < source_channels:
+            raise ValueError("selected_channel is outside the source channel range")
+        self.name_contains = name_contains
+        self.preferred_host_api = preferred_host_api
+        self.sample_rate = sample_rate
+        self.source_channels = source_channels
+        self.selected_channel = selected_channel
+        self.frame_samples = frame_samples
+        self._pyaudio_module = pyaudio_module
+        self._thread = None
+        self._stop = None
+        self._running = False
+        self._error: str | None = None
+        self._frames = 0
+        self.device: PortAudioInputDevice | None = None
+
+    def start(self, on_frame) -> None:
+        import threading
+
+        if self._thread is not None:
+            raise RuntimeError("Device AEC capture is already started.")
+        module = self._pyaudio_module
+        if module is None:
+            import pyaudio as module
+
+        # Open synchronously so a missing device fails start() rather than later.
+        audio = module.PyAudio()
+        try:
+            device = find_input_device(
+                audio,
+                name_contains=self.name_contains,
+                preferred_host_api=self.preferred_host_api,
+                sample_rate=self.sample_rate,
+                channels=self.source_channels,
+                sample_format=module.paInt16,
+            )
+            stream = audio.open(
+                input_device_index=device.index,
+                channels=self.source_channels,
+                format=module.paInt16,
+                rate=self.sample_rate,
+                frames_per_buffer=self.frame_samples,
+                input=True,
+            )
+        except Exception:
+            audio.terminate()
+            raise
+        self.device = device
+        self._stop = threading.Event()
+        self._running = True
+        self._error = None
+
+        def run() -> None:
+            try:
+                while not self._stop.is_set():
+                    pcm = stream.read(self.frame_samples, exception_on_overflow=False)
+                    frame = select_pcm16_channel(
+                        pcm,
+                        source_channels=self.source_channels,
+                        selected_channel=self.selected_channel,
+                    )
+                    self._frames += 1
+                    on_frame(frame)
+            except Exception as exc:  # device unplugged etc.
+                self._error = str(exc) or type(exc).__name__
+            finally:
+                self._running = False
+                try:
+                    stream.close()
+                finally:
+                    audio.terminate()
+
+        self._thread = threading.Thread(
+            target=run, name="butler-device-aec-capture", daemon=True
+        )
+        self._thread.start()
+
+    def stop(self, timeout: float = 5.0) -> None:
+        if self._stop is not None:
+            self._stop.set()
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout=timeout)
+        self._thread = None
+
+    def snapshot(self) -> dict[str, object]:
+        return {
+            "backend": "device_aec",
+            "running": self._running,
+            "error": self._error,
+            "frames": self._frames,
+            "device": self.device.name if self.device else None,
+        }

@@ -140,6 +140,11 @@ class OpenAICompatibleChatBackend(LLMBackend):
             request["tools"] = chat_tools
         if self._extra_body:
             request["extra_body"] = self._extra_body
+        if self.is_local and _requests_no_think(messages):
+            # Newer Ollama builds ignore Qwen3's "/no_think" text switch and
+            # reason anyway (~700 hidden tokens on a one-line reply). The
+            # explicit request field is honoured, so send both.
+            request["reasoning_effort"] = "none"
 
         probe_started = time.perf_counter()
         before = (
@@ -252,6 +257,16 @@ class OpenAICompatibleChatBackend(LLMBackend):
             operation="stream",
         )
         yield completion
+
+
+def _requests_no_think(messages: list[dict[str, Any]]) -> bool:
+    """True when the last user turn ends with the ``/no_think`` soft switch."""
+
+    for message in reversed(messages):
+        if message.get("role") == "user":
+            content = message.get("content")
+            return isinstance(content, str) and content.rstrip().endswith("/no_think")
+    return False
 
 
 def _first_choice(chunk: Any) -> Any | None:

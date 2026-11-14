@@ -1,0 +1,10 @@
+# Stand-in for mb-core-v1 while its fine-tuned weights live only on the
+# Windows PC. Stock Qwen3 14B with mb-core-v1's sampling and context settings.
+# Butler sends its own system prompt, so none is baked in here, and Qwen's own
+# chat template is kept so tool calls work.
+#
+# Build:  ollama create qwen3-butler:14b -f models/qwen3-butler.Modelfile
+FROM qwen3:14b
+
+PARAMETER num_ctx 16384
+PARAMETER temperature 0.2

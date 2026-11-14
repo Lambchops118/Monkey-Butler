@@ -1,5 +1,34 @@
 # Open Questions
 
+## Wake-only voice product choices (2026-11-10)
+
+See [`voice_wake_interaction_requirements_11102026.md`](../../voice_wake_interaction_requirements_11102026.md).
+The deployed-host response timing target, exact wake/listening feedback,
+listening-window duration, and policy for continuing conversation after a
+completed answer remain open. The coding agent must choose implementation
+mechanics within the documented behavior and repository invariants; no design
+choice is implied by this requirements record.
+
+## Model interaction surface choices (2026-11-10)
+
+See [`interaction_surface_rework_11102026.md`](../../interaction_surface_rework_11102026.md).
+Choose whether the eventual public API has one endpoint with negotiated output
+or two thin endpoints over one controller; decide how terminal, browser, and SMS
+show asynchronous completion; define partial-output/error presentation; and
+specify an explicit hosted-debug control without accidental remote fallback.
+No runtime choice is implied by the documentation proposal.
+
+## Foreground/background rework choices (2026-11-10)
+
+The proposed design is in
+[`background_rework_11102026.md`](../../background_rework_11102026.md).
+Before implementation rollout, establish the acceptable foreground first-speech
+and concurrent-turn latency on the Linux/ReSpeaker host; decide the default
+delivery timing for background completion; measure model/context/tool fit and
+quality on the A2000; and define cancellation and restart behavior for jobs
+whose external effects may already have happened. No GPU layout or background
+model has been selected yet.
+
 ## Tool-history repair acceptance (2026-09-21)
 
 The no-op lights tool is removed and structured local streaming history is
