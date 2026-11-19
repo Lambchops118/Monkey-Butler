@@ -1507,8 +1507,8 @@ def _summarize_tool_result(name: str, raw_output: str) -> str | None:
 
 def _shape_tool_output(name: str, result: Any) -> str:
     raw_output = str(result)
-    if name in {"list_device_information", "get_device_information"}:
-        # DIS has bounded pages/fields. Preserve structured freshness, evidence,
+    if name in {"list_device_information", "get_device_information", "get_world_context"}:
+        # DIS/WCS have bounded pages/fields. Preserve structured times, evidence,
         # pagination and failures rather than cutting or summarizing its JSON.
         return raw_output
     shaped_output = raw_output
@@ -1920,6 +1920,16 @@ def _device_information_context(tool_access: str) -> str | None:
         return "DIS: Device information unavailable (summary_failed)."
 
 
+def _world_context(tool_access: str) -> str | None:
+    if _tool_access.normalize(tool_access) != _tool_access.FULL or not env_bool("BUTLER_WCS_SUMMARY_ENABLED", True):
+        return None
+    from butler.wcs.service import prompt_summary
+    try:
+        return prompt_summary()
+    except Exception:
+        return "WCS: World context unavailable (summary_failed)."
+
+
 def _observe_device_control(name: str, arguments: Any, tool_access: str) -> str | None:
     if name != "set_smart_plug" or not _tool_access.is_tool_permitted(name, tool_access):
         return None
@@ -1995,6 +2005,9 @@ def run_command(
     device_context = _device_information_context(tool_access)
     if device_context:
         input_items.append({"role": "system", "content": device_context})
+    world_context = _world_context(tool_access)
+    if world_context:
+        input_items.append({"role": "system", "content": world_context})
     input_items.append({"role": "user", "content": command})
 
     try:
@@ -2656,6 +2669,9 @@ def run_command_stream(
         device_context = _device_information_context(tool_access)
         if device_context:
             messages.append({"role": "system", "content": device_context})
+        world_context = _world_context(tool_access)
+        if world_context:
+            messages.append({"role": "system", "content": world_context})
         # Dynamic reasoning control: suppress the Qwen3 <think> block on quick
         # commands (the dominant local-model latency cost) and keep it for
         # analytical requests. Only the outgoing turn is decorated; the original

@@ -43,6 +43,7 @@ that make up a full deployment.
 - Remember conversations and explicitly saved facts in the local SQLite store
 - Control configured smart switches and other independent integrations
 - Observe configured lights and the coffee plug through the read-only [Device Information System](docs/DIS.md)
+- Receive cached, timestamped outdoor weather through the [World Context System](docs/WCS.md)
 - Use MCP tools for local services, files, KiCad, and Minecraft diagnostics
 - Run durable background jobs without blocking the foreground conversation
 - Accept text commands over a private Tailscale connection

@@ -388,10 +388,16 @@ def mcp_catalog() -> list[McpEntry]:
             detail="read-only device state and health",
         ),
         McpEntry(
+            key="world_context",
+            label="World context (WCS)",
+            kind="provider",
+            detail="read-only cached outdoor weather observations",
+        ),
+        McpEntry(
             key="home_automation",
             label="Home automation tools",
             kind="provider",
-            detail="current time and weather",
+            detail="current date and time",
         ),
         McpEntry(
             key="discord_messages",

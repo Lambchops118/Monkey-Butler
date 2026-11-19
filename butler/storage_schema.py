@@ -18,6 +18,9 @@ TABLE_OWNERS = {
     "dis_devices": "dis",
     "dis_observations": "dis",
     "dis_health": "dis",
+    "wcs_sources": "wcs",
+    "wcs_observations": "wcs",
+    "wcs_hourly_forecasts": "wcs",
 }
 
 # (version, name, ordered SQL statements). SQL runs in one transaction.
@@ -161,4 +164,21 @@ MIGRATIONS = (
         "ALTER TABLE dis_health ADD COLUMN boot_id TEXT",
         "ALTER TABLE dis_health ADD COLUMN last_contact REAL",
     )),
+    (4, "wcs_latest_observations", (
+        """CREATE TABLE wcs_sources (
+            category TEXT PRIMARY KEY, config_json TEXT NOT NULL, status TEXT NOT NULL,
+            last_attempt REAL, last_success REAL, next_poll REAL,
+            errors_json TEXT NOT NULL DEFAULT '[]', failures INTEGER NOT NULL DEFAULT 0)""",
+        """CREATE TABLE wcs_observations (
+            category TEXT NOT NULL REFERENCES wcs_sources(category) ON DELETE CASCADE,
+            subject TEXT NOT NULL, kind TEXT NOT NULL, observed_at REAL, received_at REAL NOT NULL,
+            data_json TEXT NOT NULL, PRIMARY KEY(category, subject, kind))""",
+    )),
+    (5, "wcs_hourly_forecasts", (
+        """CREATE TABLE wcs_hourly_forecasts (
+            category TEXT NOT NULL REFERENCES wcs_sources(category) ON DELETE CASCADE,
+            valid_from REAL NOT NULL, data_json TEXT NOT NULL,
+            PRIMARY KEY(category, valid_from))""",
+    )),
+
 )

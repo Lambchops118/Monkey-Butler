@@ -204,3 +204,42 @@ host telemetry. Jeep remains conceptual. No answer is needed to maintain honest
 inventory-only records. Waterer firmware currently has 30-second heartbeats and
 300-second periodic state; shorter outage detection would require a separately
 authorized source-protocol/firmware decision. No firmware change was made.
+
+
+## WCS v1 and later sources (2026-11-19)
+
+Weather-only v1 has no blocking owner question. The owner selected a 900-second
+poll interval. Camera observations, room sensors, presence and personal location
+still need real read/push contracts, privacy/identity semantics and independent
+source schedules in separately assigned tasks. User-reported plans and temporal
+interpretation are not implemented by weather WCS. Existing host-clock injection
+and invalid-timezone fallback limitations remain a separate hardening task;
+this implementation preserves source/receipt/forecast times without fixing the
+host's clock synchronization. API budgets outside scheduled home-weather polls
+(explicit other-location lookups/other clients) remain outside WCS ownership.
+
+
+WCS route update (2026-11-19): direct get_current_weather and its other-location
+lookup capability are removed from agent registration (ADR-064). The earlier
+other-location API-budget exception is no longer an active agent route. No
+blocking question remains for this cleanup.
+
+
+Hourly weather (2026-11-19): v1 deliberately has no hourly forecasts. The reported
+68 F at 8 a.m. was a model reuse of the daily high, not a source hourly reading.
+Adding hourly data is a separate owner decision; no such integration is needed
+to stop unsupported answers. No blocking question remains for this correction.
+
+
+Hourly weather update (2026-11-19): owner authorized implementation (ADR-066).
+Up to 48 hours are now collected in the existing poll, with cached time-range
+reads. Earlier lack-of-hourly questions are resolved; no blocking design question
+remains. Future beyond-horizon forecasts or other-location weather require a
+separate assignment. Forecast/model reliability still requires observation in use.
+
+
+Hourly rollout diagnosis (2026-11-19): actual failed turn had zero hourly records
+while retaining an old collector's future schedule. ADR-067 addresses versioned
+bootstrap without clearing evidence or bypassing retry schedules on every
+restart. LLM behavior when the provider genuinely has no hourly coverage remains
+an observed reliability limit; this fix does not claim to eliminate that risk.

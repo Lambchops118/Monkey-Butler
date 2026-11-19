@@ -7,6 +7,7 @@ from typing import Iterable
 from .base import create_server, register_all
 from .providers import (
     register_device_information_tools,
+    register_world_context_tools,
     register_discord_message_tools,
     register_home_automation_tools,
     register_sleep_mode_tools,
@@ -18,6 +19,7 @@ from .providers import (
 # launcher (and BUTLER_MCP_DISABLED_PROVIDERS) uses to switch them off.
 PROVIDERS: tuple[tuple[str, object], ...] = (
     ("device_information", register_device_information_tools),
+    ("world_context", register_world_context_tools),
     ("home_automation", register_home_automation_tools),
     ("sleep_mode", register_sleep_mode_tools),
     ("smart_plugs", register_smart_plug_tools),

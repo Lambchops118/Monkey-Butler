@@ -1,5 +1,62 @@
 # Implementation Status
 
+## Current bounded fix - hourly upgrade inherited old polling schedule (2026-11-19)
+
+Actual failed-turn log showed current code, daily high 68.22 F and zero hourly
+samples, with an inherited pre-hourly next-poll reservation. The model reused the
+high despite missing coverage; clearing conversation does not reset WCS. Added
+versioned collection configuration: preserve evidence but schedule immediate
+background collection on contract upgrade, retaining backoff for unchanged
+versions. 38 deterministic cases passed; no new model run or process restart.
+Stop at bootstrap correction; see [WCS.md](../WCS.md).
+
+## Current bounded extension - hourly WCS weather (2026-11-19)
+
+Owner authorized hourly forecasts. Existing 15-minute One Call request now
+includes up to 48 hourly samples; no extra API request or direct weather tool.
+Migration 5 persists an atomically replaced bounded series. Cached read tool
+supports offset-aware time ranges and eight-record pages. Automatic context
+compactly groups temperature/precipitation by full date and offset; default budget
+is 2400 chars. Replies remain LLM-generated. 72 deterministic cases passed; live
+provider returned 48 hourly records. See [WCS.md](../WCS.md) for exact scope and
+model validation. Restart Butler/MCP children; data arrives at next scheduled poll.
+Stop at hourly weather: no additional source/system or deployment change.
+
+## Current bounded fix - daily forecast mistaken for hourly weather (2026-11-19)
+
+Saved conversation and read-only WCS records show the model reused the 68.22 F
+daily high as an 8/9 a.m. forecast; the stored current value was 44.24 F. WCS
+collects no hourly forecast. Added explicit temporal-resolution limits to summary
+and tool description and realistic sequential hourly-question acceptance cases.
+29 deterministic cases passed; two final seven-scenario local-model runs passed.
+No new API call, hourly integration or deployment restart. Stop at this fix.
+
+## Current bounded cleanup - direct weather tool removed (2026-11-19)
+
+Removed get_current_weather registration and its special result-shaping route.
+WCS summaries and get_world_context remain the local-weather interface; date/time
+tools remain. Other-city live lookups are no longer an agent capability. Internal
+legacy formatting helper remains unregistered; no source adapter or API settings
+changed. 44 deterministic cases and one four-scenario local-model run passed.
+Restart Butler/MCP children for catalog updates. Stop at route removal.
+
+## Current bounded implementation - weather WCS v1 (2026-11-19)
+
+Owner considers DIS v1 done and authorized World Context with weather only.
+Implemented a Butler-owned source worker, shared DB migration 4, committed cache,
+owner-turn summaries, read-only HTTP/MCP access and home-weather compatibility.
+Owner selected 900-second polling. Source schedules survive restarts; source
+failure retains timestamped observations, with partial daily availability explicit.
+Forecast applicability is projected separately from historical forecast values;
+there is no universal observation expiry or model-path weather API request.
+
+123 deterministic cases passed across ten targeted discovery patterns; the final
+four-scenario local-model fixture passed three consecutive runs. One real weather
+poll reached current and daily endpoints, using temporary storage; no continuous
+worker/deployment restart. See [WCS.md](../WCS.md) for boundaries, settings,
+validation, initial failures and limitations. Stop at weather WCS v1. No camera,
+indoor sensor, presence/location, plan ingestion, Memory or Proactivity work begun.
+
 ## Current bounded implementation - DIS waterer and inventory extension (2026-11-18)
 
 Owner authorized additional devices and explicitly requested informational entries

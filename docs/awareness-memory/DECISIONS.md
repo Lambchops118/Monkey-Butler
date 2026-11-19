@@ -669,3 +669,78 @@ property freshness. No source control, inferred water flow or fuse health, new
 process/container, model-path network wait or deterministic chat reply is added.
 Retained replay and heartbeat receipt cannot promote old relay evidence to
 current. New devices require declared typed properties and a real read contract.
+
+
+## ADR-063 - Weather-only World Context v1 (2026-11-19)
+
+Owner considers DIS v1 done and authorized WCS with a similar module shape.
+Weather is the only implemented observation source. Reuse shared SQLite,
+main-process lifecycle, committed cache, owner-only automatic context and thin
+HTTP/MCP reads; no separate server/database, archived backend or inferred action.
+Owner selected 15-minute weather polling. Persist next-due scheduling before
+requests, cache location resolution, avoid model-path network calls and back off
+fully failed source polls. Partial daily-forecast failures preserve normal
+current-weather cadence. Home get_current_weather now reads the WCS cache;
+explicit different-location queries retain existing live lookup behavior.
+
+No universal expiry: retain provenance/timestamps and let the model judge
+conversational usefulness. Forecast day intervals remain explicit semantic
+constraints. Preserve raw user/world observations separately from durable memory
+and notifications; those systems are not implemented here. Current API spatial
+min/max must never become daily high/low. Weather provider daily.dt is a target
+date, not an issue time; forecast observed_at remains unknown. Future adapters
+can reuse the bounded observation contract/schedule, with source-specific typed
+validation and an actual separately authorized interface rather than placeholders.
+
+
+ADR-063 implementation evidence: a repeated local-model test treated an expired
+forecast's numeric high as today's despite date labels. Read projections now
+expose temporal_status and move out-of-interval forecast values to a separate
+historical field; routine summaries omit those numbers. Original stored evidence
+is retained. This enforces the forecast's date meaning rather than adding a
+universal expiry policy or relying on prompt prose alone.
+
+
+## ADR-064 - Retire direct weather tool route (2026-11-19)
+
+Owner requested removal now that WCS owns local-weather collection. Remove
+get_current_weather from agent registration; WCS summary/get_world_context are
+the weather interface. Accept loss of arbitrary other-location live lookups.
+Keep date/time tools and internal helpers used by the actual WCS weather adapter.
+No hidden fallback API call or alias is introduced.
+
+
+## ADR-065 - Do not infer hourly weather from daily extremes (2026-11-19)
+
+Actual conversation evidence showed correct stored values but a model hourly
+answer made from the daily high. WCS v1 exposes current observations and daily
+forecasts only. Explicitly state that specific-hour predictions are unavailable;
+never substitute or interpolate current readings/daily extrema. Preserve model
+routing of replies. Do not silently add hourly polling or spend more API calls.
+
+
+## ADR-066 - Hourly forecasts within WCS's existing poll (2026-11-19)
+
+Owner authorized the proposed lightweight hourly extension. Include up to 48
+hourly records in the existing One Call fetch, persist a bounded latest series,
+and extend get_world_context with overview/hourly selection and offset-aware
+ranges. Keep 900-second polling and cached reads; no extra API request, process
+or direct weather tool. Return target timestamps rather than derive hourly values
+from daily extrema. Preserve valid future forecasts; separate expired evidence.
+
+Local-model experiments confused partial previews with other dates/hours and
+invented hourly precipitation when omitted. Use a compact full-date/offset grouped
+temperature/precipitation table where the budget permits, and increase the default
+summary cap by 200 chars to 2400. Detailed source fields remain in cache read
+results. This is bounded model input, not deterministic conversational wording.
+
+
+## ADR-067 - Collection upgrades must not inherit incompatible poll reservations (2026-11-19)
+
+The live hourly rollout loaded legacy current/daily data and its future schedule,
+leaving zero hourly samples after a restart. Version the collection contract
+separately from observation identity. A version-only change preserves evidence
+and schedules immediate background collection once. Same-version restarts retain
+backoff/reservations; different place/units/provider still invalidates old facts.
+Do not clear conversation/WCS data or force API reads on every user request as a
+substitute. No deterministic conversational response is introduced.

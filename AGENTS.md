@@ -7,6 +7,12 @@ control execution, automation, alerts, reminders, human context and memory out o
 DIS. New device protocols require a bounded read-adapter assignment; do not
 reactivate the archived awareness backend or create placeholder adapters.
 
+The [World Context System](docs/WCS.md) is information-only and currently
+implements local outdoor weather only. Keep source observation times, receipt
+times and forecast validity distinct. Model turns/read tools use its cache;
+do not add API calls to the prompt path, universal observation expiry, controls,
+notifications or speculative camera/location integrations.
+
 For persistent storage changes, read [`docs/DATABASE.md`](docs/DATABASE.md).
 Use the shared `BUTLER_DB_PATH`, connection/migration layer and explicit table
 ownership. Do not add per-module runtime databases or delete the shared file to

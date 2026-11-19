@@ -33,7 +33,7 @@ class AwarenessRetirementTests(unittest.TestCase):
         names = {tool.name for tool in tools}
         self.assertFalse(names & RETIRED_TOOLS)
         self.assertTrue({'list_smart_plugs', 'set_smart_plug',
-                         'get_current_datetime', 'get_current_weather'} <= names)
+                         'get_current_datetime', 'get_world_context'} <= names)
 
     def test_saved_legacy_launcher_settings_cannot_restore_archived_services(self):
         with tempfile.TemporaryDirectory() as tmp:

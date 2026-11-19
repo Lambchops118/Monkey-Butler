@@ -2240,3 +2240,123 @@ Current repository state: Uncommitted extension atop first-release working tree;
 Next permitted task: Owner supplies/authorizes a bounded real status adapter or deployment acceptance; do not begin further integrations automatically.
 Required reading for next session: docs/DIS.md, DATABASE.md, ADR-062, OPEN_QUESTIONS.md and root AGENTS/tool guide.
 Explicit stop point: Passive waterer and six informational inventory entries complete; no broader awareness or control systems added.
+
+
+## 2026-11-19 - Weather-only World Context System v1
+
+Session goal: Implement WCS in the DIS shape, with local weather active and room for later bounded source adapters; ask design questions as needed.
+Current phase: Owner-authorized weather WCS v1; DIS v1 accepted as done by owner.
+Bounded task completed: Added typed source observations and weather adapter, shared-DB latest slots/source schedules, main-owned polling/cache lifecycle, owner-only per-turn summaries in both agent paths, HTTP read bridge and typed MCP get_world_context tool. Home get_current_weather now reads WCS cache; explicit other locations preserve existing live behavior. No universal expiry, physical actions, notification logic or placeholder future sources.
+Files added: butler/wcs/{__init__,models,store,weather,service,client}.py; butler/mcp_servers/providers/world_context.py; tests/test_wcs.py; tests/test_wcs_model_acceptance.py; docs/WCS.md.
+Files modified: main.py, text/server.py, agent/runtime.py, storage_schema.py, MCP aggregate/provider init/home_automation provider, launcher/config.py, settings.env, AGENTS.md, README.md, DATABASE.md, awareness-memory status/decisions/questions/session log.
+Migrations added: Version 4 wcs_latest_observations adds wcs_sources and wcs_observations with explicit wcs ownership. Migrations 1-3 unchanged; upgrade from actual temporary version-3 DIS schema preserves device rows.
+Decisions made: ADR-063. Owner selected 900-second weather polling. Poll reservation persists before API access. Fully failed source polls back off; partial daily failures preserve normal current-weather cadence. Original observation/receipt time and forecast day intervals are distinct. Outside-interval forecast values are historical, not today's values. No API call from ordinary model-turn/context/cache reads.
+Assumptions confirmed or changed: Existing configured OpenWeather endpoints and credentials work for both current weather and daily forecast. Current API min/max are spatial ranges, not daily high/low. Daily dt is target day, not forecast issue time. No fabricated confidence or issue timestamp. Future categories need real typed read/push contracts, not placeholder adapters. Existing host clock/timezone-injection limitations remain out of scope.
+Tests run: Repository .venv-main unittest discovery for test_wcs.py, test_unified_storage.py, test_home_automation_weather.py, test_mcp_disable_selection.py, test_dis.py, test_dis_pump.py, test_run_command_stream.py, test_tool_access.py, test_awareness_retirement.py, test_agent_runtime_recovery.py. Opt-in BUTLER_WCS_LIVE_MODEL_TEST=1 test_wcs_model_acceptance.py. Compileall for WCS and touched integration/test modules; git diff --check. Single live weather poll into temporary SQLite; 1000 cache-only summary formatting calls.
+Tests passed: 123 deterministic cases: 24 WCS, 12 shared-storage, 3 existing weather, 15 provider selection, 19 DIS, 7 waterer/inventory, 17 streaming turn, 9 caller-access, 5 retirement and 12 agent recovery. Final real local-model acceptance passed three consecutive four-question runs (12 scenarios) covering outdoor temperature, indoor humidity uncertainty, expired forecast rejection and WCS unavailability. Live poll reached both current/daily endpoints and validated observations; fetch about 0.57 s and pre-final-guidance summary 1665 chars. Formatting averaged about 0.038 ms over 1000 calls. Compilation/whitespace passed.
+Tests failed: An initial compile found an SQL string quoting typo and was corrected before tests. Restricted-sandbox retirement fixtures stalled and were interrupted; authorized unsandboxed execution passed. Initial model run passed but repetition exposed unavailable-context fixture bypass (tool read a retained service directly despite disabled service) and expired forecast misinterpretation. Fixed fixture to use service.read_context, strengthened unavailable guidance and implemented temporal projection rather than weakening assertions. Final local-model runs all passed. Final review also caught the non-streaming WCS insertion in a recovery helper instead of initial prompt assembly; it was moved to the correct path and a direct Responses-path owner/restricted test plus existing recovery regressions passed. Existing audioop warning remains visible.
+Commands not run: Full repository suite, actual physical commands, firmware/submodule changes, continuous 15-minute polling soak, deployment restart, full launcher GUI/voice acceptance, camera/indoor/presence/location adapters, user-plan extraction, Memory or Proactivity implementation.
+Known limitations: Source polling is designed for one main Butler owner; not an account-wide quota/distributed polling coordinator. Explicit other-location weather lookups can spend calls beyond WCS schedule. Request connect/read timeouts are not a hard total deadline; shutdown reports incomplete if its 45-second wait expires. No immutable observation history/raw payload archive. Saved source data may be old and remains timestamped; forecasts explicitly separate applicability from history. Local-model samples do not guarantee future reply correctness; unnecessary offers to fetch information remain possible without triggering API calls.
+Security implications: No new actuation or deterministic chat path. Read endpoints use existing owner/loopback token rules; restricted automatic context is absent. MCP child does not open storage/start polling. Bounded typed measurements and structured results preserve provenance; raw errors, URLs, coordinates and API credentials excluded from model context. WCS changes do not restore archived awareness.
+Deployment implications: Restart Butler/MCP children to load lifecycle/catalog/settings. Shared startup migration applies version 4 automatically. Validation used temporary DBs; no deployment process restarted or active source poller left running. Existing outdoor weather location/key/units reused.
+Unresolved questions: No blocking v1 question. Real future source contracts, identity/privacy semantics and time-injection hardening recorded in OPEN_QUESTIONS; not automatically implemented.
+Current repository state: Uncommitted weather WCS implementation on the existing branch, no commits/resets or sub-repo edits.
+Next permitted task: Owner-authorized deployment/soak acceptance or one separately scoped real WCS source adapter. Do not automatically begin the next awareness replacement system.
+Required reading for next session: docs/WCS.md, DATABASE.md, ADR-063, root AGENTS.md, tool implementation guide and implementation status.
+Explicit stop point: Weather-only WCS v1 implemented and validated; future source integrations and other systems remain unimplemented.
+
+
+## 2026-11-19 - Direct weather tool route removal
+
+Session goal: Remove redundant weather tool calling now that WCS handles weather.
+Current phase: Owner-assigned bounded WCS cleanup.
+Bounded task completed: Removed get_current_weather registration and runtime result-shaping exemption; retained WCS summaries/read tool and date/time tool. Launcher description and catalog tests updated. Internal weather formatting helper left unregistered.
+Files added: None.
+Files modified: home_automation provider, agent/runtime.py, launcher/config.py, tests/test_wcs.py, tests/test_awareness_retirement.py, WCS/status/decisions/questions/session docs. Prior WCS working-tree changes preserved.
+Migrations added: None.
+Decisions made: ADR-064. Arbitrary other-location live weather lookup is no longer an agent capability; no fallback alias introduced.
+Assumptions confirmed or changed: WCS adapter uses constants/normalization helpers, not the removed tool registration. Current date/time remains independent.
+Tests run: Repository .venv-main unittest discovery for test_wcs.py, test_awareness_retirement.py, test_mcp_disable_selection.py; BUTLER_WCS_LIVE_MODEL_TEST=1 test_wcs_model_acceptance.py; compilation and whitespace check.
+Tests passed: 44 deterministic cases (24+5+15), one four-scenario local-model fixture with simulated weather and only WCS read tools. Catalog absence/failed direct invocation and retained WCS/time routes verified. Compilation/whitespace passed.
+Tests failed: None in this cleanup. Existing audioop deprecation warning remains.
+Commands not run: Full repository suite, actual weather API, physical commands, deployment restart.
+Known limitations: Weather covers only configured local location; no agent lookup of arbitrary other cities. Internal legacy formatter remains unused by registered tools.
+Security implications: Removes model-triggered direct weather API route. Existing WCS owner access/cache-only reads unchanged.
+Deployment implications: Restart Butler/MCP children to discard old tool catalogs.
+Unresolved questions: None blocking.
+Current repository state: Uncommitted route cleanup atop WCS implementation; no reset/commit or deployment action.
+Next permitted task: Separately assigned bounded work; no new source/system automatically begun.
+Required reading for next session: docs/WCS.md and implementation status.
+Explicit stop point: Direct weather route retired; WCS remains operational.
+
+
+## 2026-11-19 - Investigate unsupported 8 a.m. weather answer
+
+Session goal: Determine whether 68 F versus external 38 F was an API discrepancy or system problem.
+Current phase: Bounded WCS diagnosis and hourly-forecast interpretation correction.
+Bounded task completed: Read-only inspection of WCS records and relevant saved conversation identified daily high 68.22 F reused for both 8 a.m. and 9 a.m.; current source record was 44.24 F. Added explicit no-hourly-data guidance and realistic sequential model regression cases.
+Files added: None.
+Files modified: butler/wcs/service.py, world_context provider description, tests/test_wcs_model_acceptance.py, WCS docs and status/decisions/questions/session log. Existing working tree preserved.
+Migrations added: None.
+Decisions made: ADR-065. Specific-hour forecasts are unavailable, not derived from a daily high/low or current reading. No additional source polling.
+Assumptions confirmed or changed: Persisted values were correctly separated; the error occurred when the model interpreted a daily high as an hourly prediction. User's external 38 F source was not independently verified at the same time/location, so no general API-accuracy conclusion is claimed.
+Tests run: .venv-main unittest discovery test_wcs.py and test_awareness_retirement.py; opt-in test_wcs_model_acceptance.py with seven scenarios; compilation/whitespace checks.
+Tests passed: 29 deterministic cases (24 WCS, 5 catalog/retirement). Two final seven-scenario local-model runs passed (14 scenarios), explicitly declining unsupported 8/9 a.m. forecasts while preserving daily high/current readings. Compilation/whitespace passed.
+Tests failed: None in final validation. Summary guidance was kept within the existing minimum budget. Existing audioop warning remains.
+Commands not run: Full suite, external weather API, independent external hourly verification, production restart, hourly integration or physical commands.
+Known limitations: WCS still cannot answer hourly forecasts; model acceptance is a bounded sample, not a universal guarantee. Existing API observation and daily forecast values may themselves vary between providers.
+Security implications: Read-only diagnosis, no new API or action route. Replies remain model-generated.
+Deployment implications: Restart Butler/MCP children to load prompt/tool-description correction. No running process restarted.
+Unresolved questions: Whether to separately implement hourly forecasts later; not needed for truthful v1 behavior.
+Current repository state: Uncommitted bounded fix atop existing WCS work, no resets/commits/sub-repo edits.
+Next permitted task: Separately authorized source expansion or deployment acceptance.
+Required reading for next session: docs/WCS.md and ADR-065.
+Explicit stop point: Hourly misinterpretation diagnosed and guarded; no weather data expansion.
+
+
+## 2026-11-19 - Hourly forecasts in WCS
+
+Session goal: Implement lightweight hourly weather forecasts while keeping replies routed through the LLM.
+Current phase: Owner-authorized bounded hourly WCS extension.
+Bounded task completed: Existing One Call poll includes hourly data; validates and caches up to 48 target-time records with temperature/conditions/precipitation. Added atomic bounded series persistence, offset-aware cached time-range reads through existing HTTP/MCP route, compact date/offset-grouped summary and actual-schema model acceptance. No new direct weather tool, process, notification behavior or deterministic reply.
+Files added: tests/test_wcs_hourly.py.
+Files modified: WCS models/weather/store/service/client, world_context provider, text/server.py, storage_schema.py, settings.env, WCS/shared-DB/status/decisions/questions/session docs and existing WCS/model tests. Prior working tree preserved.
+Migrations added: Version 5 wcs_hourly_forecasts with WCS ownership and per-category/time primary key. Migrations 1-4 unchanged.
+Decisions made: ADR-066. Keep 900-second polling/request count; hourly resolution/target dates are explicit. None hourly batch preserves old data on failure, valid replacement is atomic. Context cap increased from 2200 to 2400 chars for compact temperature/precipitation timeline; full structured detail stays in read tools. Date/offset/metric matching required; no interpolation or reuse of daily extrema.
+Assumptions confirmed or changed: Configured One Call API supports hourly on the same request; live check returned all 48 records. Partial next-hours previews proved insufficient for this local model: it reused other dates/hours and invented missing hourly precipitation despite guidance. Compact grouped timeline corrected tested cases. Forecast_at explicitly includes offset, including fixed-offset fallback/repeated DST hour. Hour buckets are selection windows, not constant-weather assertions.
+Tests run: Repository unittest discovery test_wcs_hourly.py, test_wcs.py, test_unified_storage.py, test_dis.py and test_awareness_retirement.py; opt-in BUTLER_WCS_LIVE_MODEL_TEST=1 test_wcs_model_acceptance.py using actual provider schema. Single real weather poll into temporary SQLite; compilation/whitespace checks.
+Tests passed: 72 deterministic cases: 12 hourly, 24 WCS, 12 shared DB, 19 DIS and 5 retirement/catalog. Final eleven-scenario local-model acceptance passed twice (22 question scenarios), including 38 F/40 F at 8/9 a.m., 55 F at a different date/hour and 73 percent hourly precipitation. Existing current/daily/indoor/expired/unavailable cases retained. Live API returned 48 hourly records with ready source health and no additional endpoint request. Compilation/whitespace passed.
+Tests failed: Early local-model runs reused another previewed hour/date, claimed unavailable without lookup, invented indoor humidity after an over-shortened prompt, and invented hourly precipitation omitted from context. Restored indoor boundary and improved compact full-date/metric context rather than weakening assertions. A summary-fit case exposed float-representation bloat and metadata overhead; two-decimal preview rounding and compact source/overview fields fixed it within the explicit budget. Final assertions pass. Existing audioop warning remains visible.
+Commands not run: Full repository suite, continuous 15-minute soak, production restart, arbitrary other-location API or physical actions. No source other than weather added.
+Known limitations: Forecast horizon/provider availability bounded to cached hours; no interpolation. Smaller budgets/longer text can omit points, requiring read tools. LLM may still misinterpret or offer unnecessary work; model tests are bounded samples, not universal guarantees. Conditions and less-common current/daily metrics are in full structured reads. Connect/read timeout and single-main-owner limitations unchanged.
+Security implications: Existing owner/loopback auth, restricted-turn context exclusion and schema validation preserved. New time queries require explicit UTC offset and max 48h range. No model-path API calls, arbitrary endpoint, command execution or canned user reply.
+Deployment implications: Restart Butler/MCP children to load migration 5 and extended schema. Existing persisted next-poll reservation remains; first hourly data arrives at next scheduled poll. Temporary live-check service/store stopped. No production process restarted or shared DB manually rewritten.
+Unresolved questions: None blocking; future sources/beyond-horizon forecasts remain separate tasks.
+Current repository state: Uncommitted hourly extension atop WCS working tree; no commit/reset/sub-repo edit.
+Next permitted task: Separately assigned deployment/soak acceptance or real source extension; do not begin automatically.
+Required reading for next session: docs/WCS.md, DATABASE.md, ADR-066 and tool guide.
+Explicit stop point: Hourly weather implemented and validated; no broader awareness/proactivity work.
+
+
+## 2026-11-19 - Investigate persistent 68 F hourly answer after history reset
+
+Session goal: Trace actual failed 9 a.m. answer after conversation/memory reset.
+Current phase: Bounded rollout diagnosis and collection-upgrade bootstrap fix.
+Bounded task completed: Read-only DB inspection and exact sent LLM payload at 01:27:50 proved new code was active but hourly cache was empty. Legacy 01:17 current/daily records retained next poll 01:32. The model ignored missing coverage and reused daily high 68.22 F. Added version-only schedule invalidation while preserving evidence; unchanged-version backoff stays intact. Observed actual scheduled poll populate forecasts without restart/forced refresh.
+Files added: None.
+Files modified: butler/wcs/weather.py, store.py, tests/test_wcs_hourly.py, WCS/status/decisions/questions/session docs. Prior changes preserved.
+Migrations added: None.
+Decisions made: ADR-067. Weather collection_version=2 triggers one immediate background poll on upgrade, not on every restart/request. Observation identity changes still clear mismatched data; version-only changes preserve evidence.
+Assumptions confirmed or changed: Clearing conversation does not clear WCS by design. Updated code was running, so a blanket stale-process explanation was wrong. Missing hourly rollout data came from reusing the pre-hourly schedule. Live 01:32:13 poll now supplies 52.18 F for November 19 09:00 America/New_York. Geocoding resolves Baltimore, Maryland, not another Baltimore. External approximately 45 F source was not supplied/independently verified; no claim it agrees with provider.
+Tests run: .venv-main unittest discovery test_wcs_hourly.py and test_wcs.py; compilation and git diff --check. Read-only running cache query/short monitoring through scheduled poll, targeted request-log/SQLite inspection, one read-only direct-geocoding request.
+Tests passed: 38 deterministic cases (14 hourly +24 WCS), including preserving saved facts while immediately collecting upgraded data and keeping same-version failure backoff. Compilation/whitespace passed. Live running cache returned one exact 9 a.m. forecast with source ready and explicit offset/temperature 52.18 F.
+Tests failed: No final functional assertion failures. Sandbox CIM inventory was unavailable; existing per-run request logs identified the running process/context without escalation. No raw credentials or unrelated conversations printed. Existing audioop warning remains.
+Commands not run: Full suite, new local-model acceptance, actual user-turn replay, forced weather fetch, production restart, broad log dump, physical actions or changes to history/settings.
+Known limitations: This fixes bootstrap collection, not model obedience during genuine missing data. User's expected approximately 45 F still differs from the actual provider's 52.18 F; source/time/location comparison remains unverified. New code's upgrade handling loads on next restart; current process already obtained hourly data at its regular poll.
+Security implications: Read-only diagnosis and normal module registration fix; no direct deterministic reply, prompt-path API fetch or controls. Geocoding check only; weather forecast came from the running cache/normal poll.
+Deployment implications: No restart performed. Current hourly cache is populated. Next restart loads one-time versioned bootstrap behavior; same-version restarts preserve API budget/backoff.
+Unresolved questions: Which external source/location/time produced approximately 45 F, if a provider comparison is desired. No blocker to fixing the confirmed bootstrap bug.
+Current repository state: Uncommitted fix atop WCS work; no commit/reset or sub-repo edit.
+Next permitted task: Separately assigned provider comparison or deployment acceptance; no broader subsystem expansion.
+Required reading for next session: docs/WCS.md, ADR-067 and implementation status.
+Explicit stop point: Actual failing prompt traced, bootstrap bug fixed/tested and running hourly data verified; no deterministic response path added.
