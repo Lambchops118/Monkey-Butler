@@ -6,6 +6,7 @@ import time
 
 from butler import router
 from butler.config import load_environment
+from butler.dis import service as dis_service
 from butler.storage import initialize_database
 from butler.display import DisplayState
 from butler.phone import inbound_server as phone_inbound_server
@@ -32,45 +33,50 @@ def main() -> int:
     # Fail clearly before any router, scheduler, or server starts on bad storage.
     initialize_database()
 
-    display_state = DisplayState()
-    central_queue = queue.Queue()
-
-    router_thread = threading.Thread(
-        target=router.router_loop,
-        args=(central_queue, display_state),
-        daemon=True,
-    )
-    router_thread.start()
-
-    text_server = text_agent_server.start_text_agent_server(
-        central_queue,
-        display_state=display_state,
-    )
-    sms = sms_server.start_sms_server(central_queue)
-    phone_inbound = phone_inbound_server.start_phone_inbound_server(central_queue)
-    scheduler = tasks.start_scheduler(display_state, central_queue)
-    _start_agent_warmup()
-
+    dis_service.start_service()
     try:
-        print("Main agent running headless. Press Ctrl+C to stop.")
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("Stopping main agent.")
-    finally:
-        central_queue.put(None)
-        router_thread.join(timeout=2)
+        display_state = DisplayState()
+        central_queue = queue.Queue()
+
+        router_thread = threading.Thread(
+            target=router.router_loop,
+            args=(central_queue, display_state),
+            daemon=True,
+        )
+        router_thread.start()
+
+        text_server = text_agent_server.start_text_agent_server(
+            central_queue,
+            display_state=display_state,
+        )
+        sms = sms_server.start_sms_server(central_queue)
+        phone_inbound = phone_inbound_server.start_phone_inbound_server(central_queue)
+        scheduler = tasks.start_scheduler(display_state, central_queue)
+        _start_agent_warmup()
 
         try:
-            scheduler.shutdown(wait=False)
-        except Exception:
-            pass
+            print("Main agent running headless. Press Ctrl+C to stop.")
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("Stopping main agent.")
+        finally:
+            central_queue.put(None)
+            router_thread.join(timeout=2)
 
-        text_agent_server.shutdown_text_agent_server(text_server)
-        sms_server.shutdown_sms_server(sms)
-        phone_inbound_server.shutdown_phone_inbound_server(phone_inbound)
-        print("Exiting cleanly.")
-    return 0
+            try:
+                scheduler.shutdown(wait=False)
+            except Exception:
+                pass
+
+            text_agent_server.shutdown_text_agent_server(text_server)
+            sms_server.shutdown_sms_server(sms)
+            phone_inbound_server.shutdown_phone_inbound_server(phone_inbound)
+            print("Exiting cleanly.")
+        return 0
+    finally:
+        dis_service.stop_service()
+
 
 
 if __name__ == "__main__":

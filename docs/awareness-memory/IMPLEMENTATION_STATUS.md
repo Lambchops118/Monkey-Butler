@@ -1,5 +1,30 @@
 # Implementation Status
 
+## Current bounded implementation - DIS waterer and inventory extension (2026-11-18)
+
+Owner authorized additional devices and explicitly requested informational entries
+before live interfaces exist. Implemented passive canonical waterer MQTT readings,
+migration 3 provenance, separate liveness/property freshness and six inventory-only
+entries (printer, kitchen screen, TV, Minecraft software/host, conceptual Jeep).
+No new user-facing deterministic response or control path. Extension checks:
+38 deterministic cases and one four-scenario local-model acceptance passed.
+Live subscribe-only check received a current waterer heartbeat; no live relay
+snapshot arrived in the bounded window. See [DIS.md](../DIS.md). Stop here;
+additional live adapters require real status contracts and separate assignment.
+
+## Earlier bounded implementation - DIS first release (2026-11-18)
+
+Implemented the information-only Kasa slice: six lights and the coffee plug,
+shared DB migration 2, bounded background reads, qualified cached state/health,
+owner-turn summaries, read-only HTTP/MCP tools and nonblocking priority refresh
+after existing light/plug commands. No optimistic state assignment or DIS
+control execution. Kitchen screen deferred by owner; pump adapter remains a
+separate bounded task. See [DIS.md](../DIS.md) for exact scope, validation and
+rollout. 206 deterministic cases passed; the four-scenario local-model fixture
+passed three consecutive final runs. Live reads reached six lights; coffee
+remained unreachable/unknown. No power commands, full deployment restart or
+other awareness-replacement systems. Stop at this first release.
+
 ## Current bounded cleanup - retired launcher controls (2026-11-18)
 
 Removed missed Awareness/MQTT and situation-snapshot controls, their load/save

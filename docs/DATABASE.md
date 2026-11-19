@@ -4,6 +4,9 @@ Implemented 2026-11-18. All active persistent stores use one local SQLite file:
 `db/butler.sqlite3`. This is application infrastructure, not a revived awareness
 backend. No Docker, database server, vector extension or new dependency is needed.
 
+> DIS update: migration 2 adds three implemented DIS tables; migration 3 adds passive-source provenance and health metadata. See [DIS.md](DIS.md).
+> The original storage-unification validation below remains a historical record.
+
 ## Startup and configuration
 
 `butler.main.main()` calls `initialize_database()` before starting the router,
@@ -36,12 +39,14 @@ would require measurement before choosing another storage design.
 | Conversation (`MemoryStore`) | `conversation_sessions`, `conversation_messages`, `conversation_facts`, `conversation_summaries` |
 | Jobs (`JobStore`) | `jobs`, `job_events` |
 | Phone (`PhoneCallStore`) | `phone_calls`, `phone_call_events` |
+| DIS | `dis_devices`, `dis_observations`, `dis_health` |
 | Storage | `butler_schema_migrations` |
 
 Conversation records retain real paired tool exchanges/schema metadata and
 interruption semantics. Sharing storage does not merge conversational memory
-with another product module. No Devices, World Context or future semantic-memory
-tables are created in this change.
+with another product module. Initial unification created no speculative tables. DIS now owns only the
+registry/latest-observation/contact tables implemented in its first release;
+World Context and future semantic-memory tables are still absent.
 
 `butler/storage_schema.py` defines the ownership map and immutable migration
 statements. `butler/storage.py` owns path resolution, connection settings,

@@ -2,6 +2,11 @@
 
 These instructions apply to every coding-agent session in this repository. The former awareness subsystem is archived under `archive/awareness/` and is not an active runtime dependency. For historical context and the retirement boundary, start with [`docs/awareness-memory/IMPLEMENTATION_STATUS.md`](docs/awareness-memory/IMPLEMENTATION_STATUS.md). Do not reactivate it or begin replacement systems without an explicitly assigned bounded task.
 
+The [Device Information System](docs/DIS.md) is strictly information-only. Keep
+control execution, automation, alerts, reminders, human context and memory out of
+DIS. New device protocols require a bounded read-adapter assignment; do not
+reactivate the archived awareness backend or create placeholder adapters.
+
 For persistent storage changes, read [`docs/DATABASE.md`](docs/DATABASE.md).
 Use the shared `BUTLER_DB_PATH`, connection/migration layer and explicit table
 ownership. Do not add per-module runtime databases or delete the shared file to

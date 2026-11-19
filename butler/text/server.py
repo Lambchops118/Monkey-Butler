@@ -18,6 +18,8 @@ from butler.agent import runtime as agent_runtime
 from butler.agent import tool_access
 from butler.agent.conversation import resolve_session, voice_session_id
 from butler.config import env_bool, load_environment
+from butler.dis import service as dis_service
+from butler.dis.models import ID_PATTERN, unavailable as dis_unavailable
 from butler.jobs import get_default_job_store
 from butler.messages import AnnouncementPayload, EventPayload, Message, TextPayload
 from butler.router import interaction_mode_for_source, request_uses_background, turn_context
@@ -144,6 +146,32 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        if path == "/dis/devices":
+            # Existing main-service transport, not a new DIS server. Remote
+            # reads require the owner API token; loopback MCP uses it if set.
+            if not self._is_loopback() and not self.server.config.api_token:
+                self._write_json(HTTPStatus.FORBIDDEN, dis_unavailable('not_authorized'))
+                return
+            if not self._authorize_request(require_token=True):
+                return
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                if set(query) - {'device_id', 'offset', 'limit', 'refresh'} or any(len(v) != 1 for v in query.values()):
+                    raise ValueError('invalid query')
+                device_id = query.get('device_id', [''])[0]
+                if device_id and not ID_PATTERN.fullmatch(device_id):
+                    raise ValueError('invalid device id')
+                offset, limit = int(query.get('offset', ['0'])[0]), int(query.get('limit', ['8'])[0])
+                refresh = query.get('refresh', ['0'])[0]
+                if not 0 <= offset <= 64 or not 1 <= limit <= 8 or refresh not in ('0', '1'):
+                    raise ValueError('invalid bounds')
+                result = dis_service.read_devices(device_id, offset, limit, refresh == '1')
+            except ValueError:
+                self._write_json(HTTPStatus.BAD_REQUEST, dis_unavailable('invalid_request'))
+                return
+            self._write_json(HTTPStatus.OK, result)
+            return
+
         if path == "/":
             self._write_html(HTTPStatus.OK, self._chat_page())
             return
@@ -163,6 +191,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
                     },
                     "display_clients": display_snapshot.get("clients", {}),
                     "mcp": peek_local_mcp_status(),
+                    "dis": dis_service.component_health(),
                 },
             )
             return

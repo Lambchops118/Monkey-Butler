@@ -382,6 +382,12 @@ def mcp_catalog() -> list[McpEntry]:
             detail="time, weather, smart switches, display and messaging",
         ),
         McpEntry(
+            key="device_information",
+            label="Device information (DIS)",
+            kind="provider",
+            detail="read-only device state and health",
+        ),
+        McpEntry(
             key="home_automation",
             label="Home automation tools",
             kind="provider",

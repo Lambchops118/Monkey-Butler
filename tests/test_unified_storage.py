@@ -68,7 +68,7 @@ class UnifiedStorageTests(unittest.TestCase):
         self.assertIsNotNone(jobs.get_job(job.job_id))
         self.assertEqual(jobs._conn.execute('SELECT count(*) FROM job_events').fetchone()[0], 1)
         self.assertIsNotNone(phone.get_call('call-1'))
-        self.assertEqual(memory._conn.execute('SELECT count(*) FROM butler_schema_migrations').fetchone()[0], 1)
+        self.assertEqual(memory._conn.execute('SELECT count(*) FROM butler_schema_migrations').fetchone()[0], len(storage.MIGRATIONS))
 
     def test_history_only_clear_preserves_saved_facts_and_calls(self):
         memory, phone = self.store(MemoryStore), self.store(PhoneCallStore)
@@ -129,7 +129,7 @@ class UnifiedStorageTests(unittest.TestCase):
 
     def test_migration_failure_rolls_back_ddl_and_ledger(self):
         storage.initialize_database()
-        migrations = storage.MIGRATIONS + ((2, 'broken', (
+        migrations = storage.MIGRATIONS + ((len(storage.MIGRATIONS) + 1, 'broken', (
             'CREATE TABLE should_rollback (id INTEGER)', 'INVALID SQL')),)
         with mock.patch.object(storage, 'MIGRATIONS', migrations):
             with self.assertRaises(storage.DatabaseError):
@@ -139,7 +139,7 @@ class UnifiedStorageTests(unittest.TestCase):
             self.assertIsNone(connection.execute(
                 "SELECT name FROM sqlite_master WHERE name='should_rollback'"
             ).fetchone())
-            self.assertEqual(connection.execute('SELECT max(version) FROM butler_schema_migrations').fetchone()[0], 1)
+            self.assertEqual(connection.execute('SELECT max(version) FROM butler_schema_migrations').fetchone()[0], len(storage.MIGRATIONS))
         finally:
             connection.close()
 

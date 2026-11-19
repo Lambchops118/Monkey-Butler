@@ -1,12 +1,17 @@
 # Devices system: bounded design proposal
 
+> Implementation update (2026-11-18): [DIS.md](DIS.md) now defines the implemented
+> first release and its stop condition. The owner explicitly limited DIS to
+> information only. It covers the existing Kasa lights/coffee plug, not pump
+> commands, human context or automation. Kitchen screen is deferred.
+
 > Storage update (2026-11-18): the owner subsequently authorized a unified Butler
 > SQLite database, now implemented in [DATABASE.md](DATABASE.md). Devices must
 > use its owned tables through that layer, rather than the dedicated-file
-> proposal below. No Devices runtime/schema has been implemented.
+> proposal below. DIS migration 2 now owns its three tables in that shared file.
 
-Date: 2026-11-18. Status: design/discovery only; no runtime implementation or
-restoration of retired controls is authorized by this document.
+Date: 2026-11-18. Status: historical proposal, followed by the explicitly
+authorized first implementation in DIS.md. Retired controls remain retired.
 
 ## Product contract
 
@@ -109,19 +114,13 @@ current connectivity. No device was queried or actuated during this design task.
 
 ## Relationship to control
 
-Observation and execution remain distinct. The initial Devices assignment does
-not restore pump/fan execution or create a generic action engine. Existing
-independent controls stay as they are until a separately scoped migration; they
-may report an actual fresh observation through the adapter, but a successful
-command submission never becomes an observed state by assignment.
-
-Any later control integration uses declared operations and typed parameters,
-runtime-bound identity/idempotency, permissions, configured confirmations,
-timeouts, acknowledgements, reconciliation and audit. Validate state-dependent
-preconditions at execution time; prompt context is not authorization or a safety
-check. After ambiguous mutation timeouts, reconcile before retrying. Firmware and
-hardware retain immediate interlocks. A registry capability entry does not
-register a callable action until its implementation is available.
+The owner confirmed DIS is strictly information-only, including for future
+printers and slave computers. Commands belong to independent subsystem tools.
+DIS may receive an observation or a priority-read trigger after an actual
+control attempt; it never executes that action or substitutes its requested
+value for observed state. Command-triggered reads run in the background and do
+not block replies. New physical controls require separate ownership and safety
+validation outside DIS. No pump/fan action is restored by this design.
 
 ## Per-turn device summary
 
@@ -221,7 +220,7 @@ latency and repeated outcomes; never actuate hardware during model tests.
   decide any hosted-provider/context disclosure policy using existing settings
   and permissions, not an implicit new external data path.
 
-The owner has selected Devices as the next subject; module/storage/contracts and
-increments above are proposals. Stop at this design and the
-[awareness retrospective](AWARENESS_RETROSPECTIVE.md). No runtime modules,
-migrations, adapters, tools or dependencies were added by this document.
+This records the original proposal and [awareness retrospective](AWARENESS_RETROSPECTIVE.md).
+The implemented first slice, current contracts and stop condition are in [DIS.md](DIS.md).
+Later device adapters remain separately scoped; the broader proposed increments
+are not authorization to begin them automatically.

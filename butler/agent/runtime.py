@@ -1507,6 +1507,10 @@ def _summarize_tool_result(name: str, raw_output: str) -> str | None:
 
 def _shape_tool_output(name: str, result: Any) -> str:
     raw_output = str(result)
+    if name in {"list_device_information", "get_device_information"}:
+        # DIS has bounded pages/fields. Preserve structured freshness, evidence,
+        # pagination and failures rather than cutting or summarizing its JSON.
+        return raw_output
     shaped_output = raw_output
     used_summary = False
 
@@ -1872,6 +1876,7 @@ def _collect_tool_outputs(
             result = f"Error calling {item.name}: {exc}"
         tool_ms = round((time.perf_counter() - started) * 1000.0, 1)
 
+        device_context = _observe_device_control(item.name, item.arguments, tool_access)
         shaped_output = _shape_tool_output(item.name, result)
         raw_result = str(result)
         tool_outputs.append(
@@ -1881,6 +1886,8 @@ def _collect_tool_outputs(
                 "output": shaped_output,
             }
         )
+        if device_context:
+            tool_outputs.append({"role": "system", "content": device_context})
         tool_events.append(
             {
                 "name": item.name,
@@ -1901,6 +1908,42 @@ def _collect_tool_outputs(
         )
         print(f"Function '{item.name}' executed with result: {_truncate_text(raw_result, 600)}")
     return tool_outputs, tool_events
+
+
+def _device_information_context(tool_access: str) -> str | None:
+    if _tool_access.normalize(tool_access) != _tool_access.FULL or not env_bool("BUTLER_DIS_SUMMARY_ENABLED", True):
+        return None
+    from butler.dis.service import prompt_summary
+    try:
+        return prompt_summary()
+    except Exception:
+        return "DIS: Device information unavailable (summary_failed)."
+
+
+def _observe_device_control(name: str, arguments: Any, tool_access: str) -> str | None:
+    if name != "set_smart_plug" or not _tool_access.is_tool_permitted(name, tool_access):
+        return None
+    from butler.dis.service import after_control
+    try:
+        parsed = _parse_function_arguments(arguments)
+        device_id = str(parsed.get("device_id") or "")
+        after_control(device_id)
+        context = _device_information_context(tool_access)
+        if context:
+            context += "\nPost-command state is unconfirmed until DIS has a new observation. Reads run in the background."
+        return context
+    except Exception:
+        return "DIS: Post-command observation unavailable; command intent is not verified state."
+
+
+def _update_device_context(messages: list[dict[str, Any]], context: str) -> None:
+    # Keep one device block, including across tool rounds, to avoid accumulating
+    # stale copies and paying for duplicate device tokens at every inference.
+    for message in messages:
+        if message.get('role') == 'system' and str(message.get('content', '')).startswith('DIS'):
+            message['content'] = context
+            return
+    messages.append({'role': 'system', 'content': context})
 
 
 def run_command(
@@ -1949,6 +1992,9 @@ def run_command(
     time_context = _current_time_context()
     if time_context:
         input_items.append({"role": "system", "content": time_context})
+    device_context = _device_information_context(tool_access)
+    if device_context:
+        input_items.append({"role": "system", "content": device_context})
     input_items.append({"role": "user", "content": command})
 
     try:
@@ -2482,11 +2528,13 @@ def _execute_chat_tool_calls(
             result = f"Error calling {call.name}: {exc}"
         tool_ms = round((time.perf_counter() - started) * 1000.0, 1)
 
+        device_context = _observe_device_control(call.name, call.arguments, tool_access)
         shaped_output = _shape_tool_output(call.name, result)
         messages.append(chat_messages_to_tool_result(call, shaped_output))
         events.append(
             {
                 "name": call.name,
+                "device_context": device_context,
                 "raw_result": str(result),
                 "output": shaped_output,
                 "failed": _tool_result_indicates_failure(str(result)),
@@ -2605,6 +2653,9 @@ def run_command_stream(
         time_context = _current_time_context()
         if time_context:
             messages.append({"role": "system", "content": time_context})
+        device_context = _device_information_context(tool_access)
+        if device_context:
+            messages.append({"role": "system", "content": device_context})
         # Dynamic reasoning control: suppress the Qwen3 <think> block on quick
         # commands (the dominant local-model latency cost) and keep it for
         # analytical requests. Only the outgoing turn is decorated; the original
@@ -2633,6 +2684,7 @@ def run_command_stream(
             # Sizes only, never content: lets the debug console show whether
             # durable memory and replayed history actually reached the prompt.
             memory_block_chars=len(memory_block or ""),
+            device_context_chars=len(device_context or ""),
             history_message_count=len(conversation_history),
             prompt_tokens_estimated=prompt_tokens_estimated,
             prompt_bytes=prompt_bytes,
@@ -2922,6 +2974,9 @@ def run_command_stream(
                 )
                 tool_history.extend([tool_calls_to_assistant_message("", effective_tool_calls), *tool_messages])
                 messages.extend(tool_messages)
+                for event in _events:
+                    if event.get("device_context"):
+                        _update_device_context(messages, event["device_context"])
                 rounds += 1
                 if action_results:
                     action_call, action_event = next(

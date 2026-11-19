@@ -179,3 +179,28 @@ no data reconciliation project is pending. Future Devices schema and diagnostic
 retention remain part of its separately assigned implementation; the kitchen
 screen contract, adapter refresh/expiry and per-turn coverage questions remain.
 See ../DATABASE.md. This change does not configure Butler to launch at OS boot.
+
+
+## DIS first-release disposition (2026-11-18)
+
+Owner choices resolved: automatic owner-turn summary enabled; five-second
+background reads; command-triggered priority reads are nonblocking rather than
+waiting before replies; kitchen screen explicitly deferred. Source reads use a
+configurable three-second deadline, 20-second freshness default and bounded
+failure backoff. The coffee plug remained unreachable during live read-only
+validation; its network/power availability remains unverified. Six lights were
+read successfully with no switching. Pump information requires a separately
+assigned adapter/liveness review and has no placeholder here. Model acceptance
+covers four specific simulated truthfulness cases, not broad tool-use reliability
+or a continuous deployment soak. See ../DIS.md.
+
+
+## DIS subsequent adapters (2026-11-18)
+
+Inventory is now recorded, but real endpoints/auth/read contracts remain unknown:
+OctoPrint on the Ender 3 Pro's Pi 3; status agent for the kitchen Pi 4 kiosk;
+Toshiba TV model/protocol; Minecraft server status endpoint/version and separate
+host telemetry. Jeep remains conceptual. No answer is needed to maintain honest
+inventory-only records. Waterer firmware currently has 30-second heartbeats and
+300-second periodic state; shorter outage detection would require a separately
+authorized source-protocol/firmware decision. No firmware change was made.

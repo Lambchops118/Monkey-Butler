@@ -42,6 +42,7 @@ that make up a full deployment.
 - Hold voice or text conversations through an OpenAI-compatible local model
 - Remember conversations and explicitly saved facts in the local SQLite store
 - Control configured smart switches and other independent integrations
+- Observe configured lights and the coffee plug through the read-only [Device Information System](docs/DIS.md)
 - Use MCP tools for local services, files, KiCad, and Minecraft diagnostics
 - Run durable background jobs without blocking the foreground conversation
 - Accept text commands over a private Tailscale connection

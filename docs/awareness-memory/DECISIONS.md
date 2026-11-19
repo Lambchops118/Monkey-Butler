@@ -628,3 +628,44 @@ but not imported/selected. Future modules append migrations only when assigned,
 without speculative tables or a separate server. This supersedes the earlier
 proposal for a dedicated Devices database file and separate conversation file;
 conversation ownership remains unchanged. Details/validation: ../DATABASE.md.
+
+
+## ADR-061 - DIS owns information; turns never wait for automatic device refresh
+
+Date: 2026-11-18. Status: accepted (explicit owner direction and implementation assignment).
+
+DIS is information-only: registry, validated observations, qualified current
+state and communication health, with read-only interfaces. It must not execute
+subsystem commands, including for future printers/computers. The first bounded
+slice covers existing Kasa lights and coffee plug; kitchen screen is deferred
+at the owner's request and pump integration is separately scoped. Use the shared
+application DB (migration 2) and Butler lifecycle; no service/container/framework
+or archived-awareness dependency is introduced.
+
+The owner selected automatic summaries on authorized owner turns, five-second
+background polling and priority refresh after a command. The owner subsequently
+clarified that minimum reply latency takes precedence over waiting for readback.
+Therefore turns format committed cached information with freshness, never query
+a device/DB on the turn path, and command refresh is nonblocking. A control
+attempt invalidates pre-command current-state qualification until a new read
+started after that request reconciles it; desired power never becomes evidence.
+Only an explicitly requested refresh tool can wait (bounded). Stale properties
+have null current values and a separate last-observed value, following a real
+local-model test that misread a stale boolean as current. Source health does
+not establish mechanical operation; coffee plug power does not establish brewing.
+No control restoration, alerts, reminders, memory or proactivity is in this task.
+See ../DIS.md for scope, test evidence and the stop condition.
+
+
+## ADR-062 - Passive waterer and explicit device inventory (2026-11-18)
+
+Owner authorized extending DIS and requested empty/informational records for
+listed devices. Implement registry-only entries with truthful not_integrated
+health, no observed properties and no adapter activity; Minecraft software and
+host are separate identities. Include the Jeep as conceptual inventory only.
+The actual waterer integration is a passive subscriber to existing canonical
+telemetry. Preserve boot/sequence/retained provenance; distinguish liveness from
+property freshness. No source control, inferred water flow or fuse health, new
+process/container, model-path network wait or deterministic chat reply is added.
+Retained replay and heartbeat receipt cannot promote old relay evidence to
+current. New devices require declared typed properties and a real read contract.

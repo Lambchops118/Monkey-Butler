@@ -15,6 +15,9 @@ TABLE_OWNERS = {
     "phone_calls": "phone",
     "phone_call_events": "phone",
     "butler_schema_migrations": "storage",
+    "dis_devices": "dis",
+    "dis_observations": "dis",
+    "dis_health": "dis",
 }
 
 # (version, name, ordered SQL statements). SQL runs in one transaction.
@@ -136,5 +139,26 @@ MIGRATIONS = (
             )""",
         """CREATE INDEX IF NOT EXISTS idx_phone_call_events_call_id
             ON phone_call_events(call_id, id)""",
+    )),
+    (2, "dis_latest_device_information", (
+        """CREATE TABLE dis_devices (
+            device_id TEXT PRIMARY KEY, name TEXT NOT NULL, adapter TEXT NOT NULL,
+            config_json TEXT NOT NULL, enabled INTEGER NOT NULL CHECK(enabled IN (0,1)))""",
+        """CREATE TABLE dis_observations (
+            device_id TEXT NOT NULL REFERENCES dis_devices(device_id) ON DELETE CASCADE,
+            property_name TEXT NOT NULL, value_json TEXT NOT NULL, received_at REAL NOT NULL,
+            evidence_id TEXT NOT NULL, PRIMARY KEY(device_id, property_name))""",
+        """CREATE TABLE dis_health (
+            device_id TEXT PRIMARY KEY REFERENCES dis_devices(device_id) ON DELETE CASCADE,
+            last_attempt REAL NOT NULL, last_success REAL, error TEXT)""",
+    )),
+    (3, "dis_passive_source_provenance", (
+        "ALTER TABLE dis_observations ADD COLUMN source TEXT NOT NULL DEFAULT 'kasa_local_read'",
+        "ALTER TABLE dis_observations ADD COLUMN retained INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE dis_observations ADD COLUMN boot_id TEXT",
+        "ALTER TABLE dis_observations ADD COLUMN source_sequence INTEGER",
+        "ALTER TABLE dis_health ADD COLUMN status TEXT NOT NULL DEFAULT 'unknown'",
+        "ALTER TABLE dis_health ADD COLUMN boot_id TEXT",
+        "ALTER TABLE dis_health ADD COLUMN last_contact REAL",
     )),
 )
