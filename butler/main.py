@@ -6,6 +6,7 @@ import time
 
 from butler import router
 from butler.config import load_environment
+from butler.storage import initialize_database
 from butler.display import DisplayState
 from butler.phone import inbound_server as phone_inbound_server
 from butler.scheduler import tasks
@@ -28,6 +29,8 @@ def _start_agent_warmup() -> None:
 
 def main() -> int:
     load_environment()
+    # Fail clearly before any router, scheduler, or server starts on bad storage.
+    initialize_database()
 
     display_state = DisplayState()
     central_queue = queue.Queue()

@@ -12,6 +12,7 @@ from unittest import mock
 from butler.launcher.config import LauncherConfig
 from butler.launcher.core import Supervisor
 from butler.launcher.gui import LauncherGUI
+from butler.launcher import config as launcher_config, gui as launcher_gui
 from butler.llm_debug import LLM_DEBUG_PREFIX, emit_llm_io, llm_debug_log_path
 
 
@@ -134,6 +135,56 @@ class LauncherLLMDebugProcessTests(unittest.TestCase):
             Path(child_env["BUTLER_LLM_DEBUG_LOG_DIR"]).parts[-2:],
             ("butler", "logs"),
         )
+
+
+class LauncherContextControlsTests(unittest.TestCase):
+    """Exercise widget construction and real settings persistence without a display."""
+
+    class Variable:
+        def __init__(self, value=None, **_kwargs):
+            self.value = value
+
+        def get(self):
+            return self.value
+
+        def set(self, value):
+            self.value = value
+
+    def test_launcher_saves_active_context_without_reintroducing_awareness(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(launcher_config, "SETTINGS_PATH", Path(tmp) / "settings.env"), \
+             mock.patch.object(launcher_config, "LAUNCHER_CONFIG_PATH", Path(tmp) / "launcher.json"), \
+             mock.patch.object(launcher_gui, "ttk") as widgets, \
+             mock.patch.object(launcher_gui, "tk") as tk, \
+             mock.patch.object(launcher_gui, "_ollama_models", return_value=[]):
+            tk.BooleanVar.side_effect = self.Variable
+            tk.StringVar.side_effect = self.Variable
+            gui = LauncherGUI.__new__(LauncherGUI)
+            gui.root = mock.Mock()
+            gui.cfg = LauncherConfig()
+            gui.gpus = []
+            gui._build_widgets()
+            gui._load_into_widgets()
+            with mock.patch.object(gui, "_apply_volume"):
+                gui._persist()
+                first_save = launcher_config.SETTINGS_PATH.read_text(encoding="utf-8")
+                gui.var_memory.set(False)
+                gui._persist()
+                second_save = launcher_config.SETTINGS_PATH.read_text(encoding="utf-8")
+
+            labels = [str(call.kwargs.get("text", ""))
+                      for kind in (widgets.LabelFrame, widgets.Checkbutton, widgets.Button)
+                      for call in kind.call_args_list]
+            self.assertIn("Conversation memory (history + saved facts)", labels)
+            self.assertIn("Clear conversation memory…", labels)
+            self.assertFalse(any("awareness" in label.lower() for label in labels))
+            self.assertFalse(hasattr(gui, "var_situation"))
+            self.assertFalse(hasattr(gui, "var_mqtt"))
+            self.assertIn("BUTLER_MEMORY_ENABLED=1", first_save)
+            self.assertIn("BUTLER_MEMORY_ENABLED=0", second_save)
+            self.assertNotIn("BUTLER_AWARENESS_", second_save)
+            self.assertFalse(any(key.startswith("BUTLER_AWARENESS_")
+                                 for key in launcher_config._SETTINGS_DEFAULTS))
 
 
 if __name__ == "__main__":

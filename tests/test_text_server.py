@@ -11,7 +11,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from butler.services import awareness_client
 from butler.agent.conversation import resolve_session
 from butler.router import request_uses_background
 from butler.text.server import TextAgentRequestHandler, _stream_state_snapshot
@@ -42,16 +41,14 @@ class TextServerLoggingTests(unittest.TestCase):
 
 
 class TextServerStreamContextTests(unittest.TestCase):
-    def test_stream_uses_awareness_snapshot_with_request_fallback(self) -> None:
-        with mock.patch.object(
-            awareness_client,
-            "snapshot_with_fallback",
-            return_value="awareness situation",
-        ) as snapshot_mock:
-            snapshot = _stream_state_snapshot({"state_snapshot": "legacy state"})
+    def test_stream_preserves_explicit_status_without_backend_access(self) -> None:
+        self.assertEqual(
+            _stream_state_snapshot({"state_snapshot": "legacy state"}),
+            "legacy state",
+        )
 
-        self.assertEqual(snapshot, "awareness situation")
-        snapshot_mock.assert_called_once_with("legacy state")
+    def test_stream_has_no_automatic_household_snapshot(self) -> None:
+        self.assertEqual(_stream_state_snapshot({}), "no recent status")
 
 
 class OwnerConversationTests(unittest.TestCase):

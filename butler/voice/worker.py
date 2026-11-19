@@ -9,7 +9,7 @@ def main() -> int:
     stop_listening = None
     speak_server = None
     try:
-        # Inbound proactive-speech endpoint (reminders, awareness alerts,
+        # Inbound speech endpoint (external announcements,
         # scheduled reports). The voice worker is the only process with TTS.
         speak_server = voice_agent.run_speak_server()
         stop_listening = voice_agent.run_voice_recognition()

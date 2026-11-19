@@ -178,13 +178,7 @@ class PhoneInboundServer(ThreadingHTTPServer):
     def situation(self) -> str | None:
         if self._situation_fn is not None:
             return self._situation_fn()
-        from butler.services import awareness_client
-
-        try:
-            return awareness_client.fetch_situation_text()
-        except Exception as exc:
-            print(f"[phone-inbound] awareness situation unavailable: {exc}")
-            return None
+        return None
 
     def memory(self) -> Any:
         if self._memory_store is not None:

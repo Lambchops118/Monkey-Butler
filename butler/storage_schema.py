@@ -1,0 +1,140 @@
+"""Immutable migrations and explicit table ownership for the unified DB.
+
+Add a new numbered migration for schema changes; never edit an applied migration.
+Only currently implemented modules have tables. Cross-module access goes through
+its owning store, except explicitly read-only dashboard projections.
+"""
+
+TABLE_OWNERS = {
+    "conversation_sessions": "conversation",
+    "conversation_messages": "conversation",
+    "conversation_facts": "conversation",
+    "conversation_summaries": "conversation",
+    "jobs": "jobs",
+    "job_events": "jobs",
+    "phone_calls": "phone",
+    "phone_call_events": "phone",
+    "butler_schema_migrations": "storage",
+}
+
+# (version, name, ordered SQL statements). SQL runs in one transaction.
+MIGRATIONS = (
+    (1, "initial_conversation_jobs_phone", (
+        # conversation owns these tables.
+        """CREATE TABLE IF NOT EXISTS conversation_sessions (
+                session_id TEXT PRIMARY KEY,
+                title TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL DEFAULT '{}'
+            )""",
+        """CREATE TABLE IF NOT EXISTS conversation_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                FOREIGN KEY(session_id) REFERENCES conversation_sessions(session_id) ON DELETE CASCADE
+            )""",
+        """CREATE INDEX IF NOT EXISTS idx_conversation_messages_session_id
+            ON conversation_messages(session_id, id)""",
+        """CREATE TABLE IF NOT EXISTS conversation_facts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                scope TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                salience INTEGER NOT NULL DEFAULT 5,
+                source_session_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(scope, key)
+            )""",
+        """CREATE INDEX IF NOT EXISTS idx_conversation_facts_salience
+            ON conversation_facts(salience DESC, updated_at DESC)""",
+        """CREATE TABLE IF NOT EXISTS conversation_summaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                scope TEXT NOT NULL,
+                scope_id TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(scope, scope_id)
+            )""",
+        """CREATE INDEX IF NOT EXISTS idx_conversation_summaries_scope
+            ON conversation_summaries(scope, scope_id)""",
+        # jobs owns these tables.
+        """CREATE TABLE IF NOT EXISTS jobs (
+                job_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                request_text TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT,
+                progress_message TEXT,
+                result_summary TEXT,
+                result_payload_json TEXT NOT NULL DEFAULT '{}',
+                error_message TEXT,
+                requires_user_input INTEGER NOT NULL DEFAULT 0,
+                resource_locks_json TEXT NOT NULL DEFAULT '[]',
+                metadata_json TEXT NOT NULL DEFAULT '{}'
+            )""",
+        """CREATE INDEX IF NOT EXISTS idx_jobs_session_status
+            ON jobs(session_id, status, updated_at DESC)""",
+        """CREATE TABLE IF NOT EXISTS job_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                FOREIGN KEY(job_id) REFERENCES jobs(job_id) ON DELETE CASCADE
+            )""",
+        """CREATE INDEX IF NOT EXISTS idx_job_events_session
+            ON job_events(session_id, id)""",
+        # phone owns these tables.
+        """CREATE TABLE IF NOT EXISTS phone_calls (
+                call_id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                provider_call_id TEXT,
+                conversation_id TEXT,
+                agent_id TEXT,
+                session_id TEXT,
+                direction TEXT NOT NULL,
+                remote_number TEXT NOT NULL,
+                contact_name TEXT,
+                purpose TEXT,
+                brief_context TEXT,
+                status TEXT NOT NULL,
+                outcome TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                started_at TEXT,
+                ended_at TEXT,
+                transcript_json TEXT NOT NULL DEFAULT '[]',
+                summary TEXT,
+                last_error TEXT,
+                metadata_json TEXT NOT NULL DEFAULT '{}'
+            )""",
+        """CREATE INDEX IF NOT EXISTS idx_phone_calls_updated
+            ON phone_calls(updated_at DESC, call_id DESC)""",
+        """CREATE INDEX IF NOT EXISTS idx_phone_calls_provider_call_id
+            ON phone_calls(provider_call_id)""",
+        """CREATE INDEX IF NOT EXISTS idx_phone_calls_session_id
+            ON phone_calls(session_id, updated_at DESC)""",
+        """CREATE TABLE IF NOT EXISTS phone_call_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                call_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                FOREIGN KEY(call_id) REFERENCES phone_calls(call_id) ON DELETE CASCADE
+            )""",
+        """CREATE INDEX IF NOT EXISTS idx_phone_call_events_call_id
+            ON phone_call_events(call_id, id)""",
+    )),
+)

@@ -5,8 +5,7 @@
 #
 # Any arguments are passed straight through to `python -m butler.launcher`.
 # The launcher pins the LLM (Ollama) to the RTX 5080 and speech-to-text to the
-# RTX 2060, brings up the awareness Postgres container, runs migrations, and
-# supervises the main agent, voice worker, and awareness backend together.
+# RTX 2060, and supervises the main agent, voice worker, and display.
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

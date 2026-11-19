@@ -1,0 +1,660 @@
+{
+  "archived_on": "2026-11-18",
+  "files": [
+    {
+      "original_path": "butler/awareness/__init__.py",
+      "sha256": "94b104233fcbf07a0c9ee22cd7b7bcc6e9f6192f7dee4e5cd247ac3a91dc2ff7",
+      "git_blob": "620186a2aa96d658c1558a645bac10d600c80a9c"
+    },
+    {
+      "original_path": "butler/awareness/__main__.py",
+      "sha256": "b9251764a3363628b68cc10f91def666a0dca3a650b9b6b514e7ea2c41b657e6",
+      "git_blob": "81ecb1ffc8b7f0bb809f2295d2993463c6dc05b0"
+    },
+    {
+      "original_path": "butler/awareness/actions/__init__.py",
+      "sha256": "d526ffaea91424845672ba035cc75abe06a3003b3193e56198977e0f9b0b3c3e",
+      "git_blob": "24f1e63b3ac0fc0b5077535145529c1ef0ce9d52"
+    },
+    {
+      "original_path": "butler/awareness/actions/actions.toml",
+      "sha256": "40b49f9e132d036e1c047bb82fcdc8f3150527e747fecfef00db32d9999d8a08",
+      "git_blob": "b737bcef958bd1f03d74db078d5fdfce8c67f9a5"
+    },
+    {
+      "original_path": "butler/awareness/actions/registry.py",
+      "sha256": "e54966ed9e964d2b69f2fc677314ac93d9cfbd61d2d04b6d126f4148438f3f6a",
+      "git_blob": "1b488f9e50ec1788b07cbf9fe07e29bf85ef3afb"
+    },
+    {
+      "original_path": "butler/awareness/actions/service.py",
+      "sha256": "b5e529747be59b574c5533c8ca7a376ec487996a88abc1ce0e5e8aed341b27a1",
+      "git_blob": "e80718461b440654efc1ac79117938543ec54d96"
+    },
+    {
+      "original_path": "butler/awareness/alembic.ini",
+      "sha256": "856b8d834260c17fb4ecced07d31ea329bb92a2a13a41ed65aaec02c47770d8d",
+      "git_blob": "6ee250412b5f4f5b1697c93c50a5f4905bdaef4e"
+    },
+    {
+      "original_path": "butler/awareness/alerts/__init__.py",
+      "sha256": "ac127de99f797559b7d9b20b66fb463aade8f68f629254c2a06f7473328a9c4a",
+      "git_blob": "ce7f43ca7270bb857555a959ed7c0a49e5340f81"
+    },
+    {
+      "original_path": "butler/awareness/alerts/service.py",
+      "sha256": "6993844114db923e552aff0f8fe48a6f0dd07fe1cd38f9490f1341a08df20a8f",
+      "git_blob": "a95534baa63abc638b7d45f23531c8dfb74f2cf8"
+    },
+    {
+      "original_path": "butler/awareness/api/__init__.py",
+      "sha256": "0514dafbcf94505be93f23ea29454ebb9a95e2cfd943f9a79f1748c60e042fb6",
+      "git_blob": "9f8f0aefc5e09f6e49e9a5f390b1ae96f95a848c"
+    },
+    {
+      "original_path": "butler/awareness/api/app.py",
+      "sha256": "1b93ed051677531a98b35ad5f076e957dea4aef055e9851fb081f0f91c09d82a",
+      "git_blob": "c54e5ec20805e298a79e72bef09909fc377c2b2f"
+    },
+    {
+      "original_path": "butler/awareness/api/auth.py",
+      "sha256": "a1c556ee63c74374f798fc1895de2f2197a3a94eb5d94c8ccee324f5b02acc0e",
+      "git_blob": "369711140ec99fd3f37830bb830e5cdf507f41c9"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/__init__.py",
+      "sha256": "faf1bf87b63a3fa2be823d9649f2410120cc3a1509253127aeed80fea9aaeb8f",
+      "git_blob": "fb0a2f808230d18b89b49b68b2bce37b7c869206"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/actions.py",
+      "sha256": "0b25aa95e1b8d7853afd753dbf53e4605fe3cb0ab9cb5d21d71c3cfa418288aa",
+      "git_blob": "19e0c5db08da13b5df39079f2d54616f8ad252cc"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/alerts.py",
+      "sha256": "2a2941d7cd61feab19c20cbc1a3d95a4bf3d9f9d20a03679130e3d34a6a04d2c",
+      "git_blob": "eb96ab3ed42bc7f7e28eadb9f81a73d4688889ce"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/briefing.py",
+      "sha256": "92e73cbe5996c53fca2616bfec6b19402e89e74c06aca10be400586849b42a49",
+      "git_blob": "e4cfe9e9164ff343f1648c6857575af0531181ca"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/context.py",
+      "sha256": "3c4b08397040674b39c381eb6040560d726a7a623edc62f0dcb966c5084395bb",
+      "git_blob": "d46d06a4ae528ede34a6df08f08e0c61e69ac4a0"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/health.py",
+      "sha256": "c2222ebcdd8e3904dd0759e61da142c0cf3c02cbdf8e4c1e5072a764f464bb96",
+      "git_blob": "7308166b2f73b9a4aeb4a6dc4038c64be96d7702"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/ingest.py",
+      "sha256": "4f9da98d589eb5fd63a1e5d64db3d4efd960a93ad26e77e8b20979fb32e8b1cd",
+      "git_blob": "f8a03862383a01977304f7c1ca59a6c0373628ec"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/memory.py",
+      "sha256": "efcb63c957b4eb5d4b5b7d5ad1a7020a9c70b12cfb84e070cd9789bcf729fde9",
+      "git_blob": "f5f521d74ae3c52b9835f10999c08c1519adfcc9"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/reads.py",
+      "sha256": "41b11743002fb03b85d6096305c62825a40c23f33cb049410532e18f50066f8c",
+      "git_blob": "c3a4d478f3b70caf0f74eb9c0a3f8e8bfe9e0827"
+    },
+    {
+      "original_path": "butler/awareness/api/routes/reminders.py",
+      "sha256": "afdb78559d9fd2289b493c9069f39fd2c6b4136db8486ad7e343d5f412907f30",
+      "git_blob": "12616f74b5e6a89d04cf535e9eb3606da38448f9"
+    },
+    {
+      "original_path": "butler/awareness/artifacts.py",
+      "sha256": "4efd8d042f01cc5861a29456987fe60675fcadc71d315c1c810e8bb5c638e953",
+      "git_blob": "e56f19dc8f4724c53387b77e69c81ce4ceea4fc6"
+    },
+    {
+      "original_path": "butler/awareness/backup.py",
+      "sha256": "566b5b0a768d0df8dbd6f58f37dff9f8e986336bf4d0541a7d10a8400a95f219",
+      "git_blob": "84d2d617cda3af6073729ce0dd68a8c48b2c92fc"
+    },
+    {
+      "original_path": "butler/awareness/benchmark.py",
+      "sha256": "6b26e10d4f9cb72bf816341f683c8756d05450761597479932505188eaa4182a",
+      "git_blob": "0fcf2907fd520e67e86d50e959b3cecbd16a4554"
+    },
+    {
+      "original_path": "butler/awareness/briefing/__init__.py",
+      "sha256": "db43fb940a51ed9a3aef5b59b1e276ef77c070632d2d9784c415e938bea9f2b0",
+      "git_blob": "7011cc626ccc51884bd29db713c13a6ef51c9332"
+    },
+    {
+      "original_path": "butler/awareness/briefing/feedback.py",
+      "sha256": "4d93425c28b03d54f5e493185a15652f942813d1c6b0f5de8ab9eaa6740ed729",
+      "git_blob": "f2603b31d5b6e3fa07dcbf75a657316e5c06b3a3"
+    },
+    {
+      "original_path": "butler/awareness/briefing/morning.py",
+      "sha256": "612aef0d37e4d2fb506f22c672e53b3d9be8499cf8b86ace0912d649d3fa0346",
+      "git_blob": "8b240becf2cb9d7cc5fed09669ace60d8831c0b3"
+    },
+    {
+      "original_path": "butler/awareness/briefing/selection.py",
+      "sha256": "bee968b733b08c4b4462d607e763d08f2df146a67edcbb3076bae82cadf7e6b3",
+      "git_blob": "993a02bf3f7b4816ec3524d9b7167213c2120d50"
+    },
+    {
+      "original_path": "butler/awareness/briefing/service.py",
+      "sha256": "a7e4c9d27c166f93b726fe9518f30ab41f72ba99d3f159c6c3628cbcdd5ca838",
+      "git_blob": "94b23491eaaee0a5e30fb05064399e3c938b2042"
+    },
+    {
+      "original_path": "butler/awareness/briefing/speech.py",
+      "sha256": "10ad39a3dde04d83b008418430eef5d3a15c800d6c3944c371f10545d8f63af9",
+      "git_blob": "bb48fa5ad8369095cc448228c64e854dcf342406"
+    },
+    {
+      "original_path": "butler/awareness/briefing/worker.py",
+      "sha256": "d2a6bf505e25a2aee0023be5cf27faff617b9bdb4bd8a3b71dbf5b00ce158b68",
+      "git_blob": "4158b7a1434add2e8c7bea5bf0085df07c4ddfca"
+    },
+    {
+      "original_path": "butler/awareness/config.py",
+      "sha256": "8d3ac4b0d61c0e3896a9e16d99b00e8f031711419202a3f91e0dfce7f9c811c9",
+      "git_blob": "cd74a4c29c0a80088c1ea514cc6594acdc545e0c"
+    },
+    {
+      "original_path": "butler/awareness/context/__init__.py",
+      "sha256": "c6a01db40a475d306cc8879b4c663ff381b969ad51f8a25c22a830f27f90390a",
+      "git_blob": "b104edb8c4899e0b8685b8b23c15cf64a49e2e0d"
+    },
+    {
+      "original_path": "butler/awareness/context/briefing.py",
+      "sha256": "c2dc86d58443e177c59ebc889eb0258e882dcd94f74f67cebea046a81c0a5f9d",
+      "git_blob": "54e9d7516b58a93a0cd5f9055e843a817757c31a"
+    },
+    {
+      "original_path": "butler/awareness/context/broker.py",
+      "sha256": "4038e5c1a5bbe52e8eab5b1ebfd319b7a5eed4034cb327fea5e2f26a11e27de8",
+      "git_blob": "75ff399e40d40b3671a9ffbd920d774ab63ebd56"
+    },
+    {
+      "original_path": "butler/awareness/db/__init__.py",
+      "sha256": "f276294a7e5766c1fa21e616e8ed316052e9163f2d247f7178be53e47533460c",
+      "git_blob": "3d6e85ba281f8c87262657ec10924c70970c87f6"
+    },
+    {
+      "original_path": "butler/awareness/db/migrate.py",
+      "sha256": "ad62fb2b5ba401455637bb748d0aae4ee22f3f4dfb98d399942e8e27f2b7f6c6",
+      "git_blob": "190b3ccd44a9f11954c4ce1f9779fdc1d1dadd5f"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/env.py",
+      "sha256": "0ad01a56d84c87088e608284eb59af86c3e3be936a4be9d7d9eb110b5b94fac9",
+      "git_blob": "dd4590b456c9f8bf46388d78085573deee6f6ba1"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/script.py.mako",
+      "sha256": "49b61228b9c5ba685388a355b8622dc08c335609dfb12c9a6f33576f595a4c7c",
+      "git_blob": "17dcba0ef89f896010374bbb3db808071268aa4c"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/versions/3337c328523b_phase_8_artifacts.py",
+      "sha256": "204391a782fb2d34f41e9f0e6c64552e562af031c06bb178afd5bfe3617db213",
+      "git_blob": "78fedf54e3de0eb75abc48f3cd1f99ae5ef0b17e"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/versions/4d268f4eae02_phase_7_action_requests.py",
+      "sha256": "8d63860547c7cb11aa5f4b064abfbff0caaeac2204d8eac93acb1e9c51473424",
+      "git_blob": "3486d67d26d849e4e08477963eae56fcd46960cf"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/versions/7bf1cd5508d3_phase_4_notification_deliveries.py",
+      "sha256": "e8c58028a10fc34a099e97239aba4470318ec3b167f26697037a721968f9a7b7",
+      "git_blob": "65f4db0f9f9f9ea60d6c695d604cbf7fa54e60a1"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/versions/a526ee7fcfdb_phase_1_foundation.py",
+      "sha256": "f2a344619d215aa7a019e845842f2ec11d068187a3608728e0f90d9c24f55a5e",
+      "git_blob": "05671c9044485e47cfd0914c2ef3b54192453651"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/versions/abc5ba9b578d_phase_6_long_term_memory.py",
+      "sha256": "f9607408cb12bd1f2cefc16a3a0ee03d08205ced3e4486f9bcc61f2a34916009",
+      "git_blob": "db10bebdf4739127ffe5b9ae294e6c20fe6be838"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/versions/b8f2a1c7d3e9_reminders.py",
+      "sha256": "c50bafced73a914c7422415c0f09f3f27465360debe6812a96543cacb552cae4",
+      "git_blob": "483cb1ba91509ae87d8c3f939757ce71cbd3c3b9"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/versions/dbfc40d327c0_phase_3_state_and_telemetry.py",
+      "sha256": "a2f94767f7fe875dc9055f38486cc18d90d2a79f9512a4319d54dcdae1712024",
+      "git_blob": "bc6843e8e13ad6fc99c7e0c5340e53ab69277a67"
+    },
+    {
+      "original_path": "butler/awareness/db/migrations/versions/e7c11f9a4b2d_phase_7_action_lifecycle_hardening.py",
+      "sha256": "f13db1935810383bbc987672c36e13d9afe16c61221029a422e617285a2fa873",
+      "git_blob": "fa35a6195de492324efbec07e18041359783608a"
+    },
+    {
+      "original_path": "butler/awareness/db/models.py",
+      "sha256": "bf95f096dbffc078ace69c65f67da0285d1e91d03038bdd65a772915825633a7",
+      "git_blob": "b79d0e208abbda54a6426a7ae6a08ca6801aca3f"
+    },
+    {
+      "original_path": "butler/awareness/db/session.py",
+      "sha256": "29cd6de24c9bf1899597b0cf73530e1ba6eb61c3534f5ee805d1d8b8c25d5e67",
+      "git_blob": "d601701ac6b9251b2037f475e5be0e1a602f7e2f"
+    },
+    {
+      "original_path": "butler/awareness/health/__init__.py",
+      "sha256": "cc06ba16d8977104912e88acea8616a56b379ec1ecd92a058619395e7988d6ab",
+      "git_blob": "9eb91009dbaca13afed13ff37ef46562f5534605"
+    },
+    {
+      "original_path": "butler/awareness/health/service.py",
+      "sha256": "029dbd69b280af49bef8a6e7f35b05ca06c95bb21569fdef8cbda7b99385f949",
+      "git_blob": "61121e0591fad65f592cd279a717541180b2e521"
+    },
+    {
+      "original_path": "butler/awareness/history/__init__.py",
+      "sha256": "78abf5d070a194375654e61414a15e7dc6d1b725367371f749e4d17ab28296b1",
+      "git_blob": "20da8f380266dbfd3a17a0609acb96c09732d524"
+    },
+    {
+      "original_path": "butler/awareness/history/briefing.py",
+      "sha256": "02ff2f3dff25899aaae16d005ca0953df4a0a2a6f42722cee5c980cda994c48c",
+      "git_blob": "87ae813913261d7853e86a93e1f04f8846b08496"
+    },
+    {
+      "original_path": "butler/awareness/history/queries.py",
+      "sha256": "3408ff7f174799120a1f29cb1e8a7dada4fa90a57cf1a4964f3b0646fb1c873c",
+      "git_blob": "789509dab82e4495a57e73deb3ec4c090ac70bec"
+    },
+    {
+      "original_path": "butler/awareness/history/telemetry.py",
+      "sha256": "23823b08fbf7eeaeced6d4ba2a779d53672d23b435f40eeae66f9737604504b1",
+      "git_blob": "43208435fc4143c6968fa9f5f29012eb3a9e450c"
+    },
+    {
+      "original_path": "butler/awareness/ingestion/__init__.py",
+      "sha256": "3c6d216c78e132cce9cac73c9378c98ab2d1de29c344646174d1ea526be38405",
+      "git_blob": "6bbcfda03b88d7a78b4bf42b149290b10caf2165"
+    },
+    {
+      "original_path": "butler/awareness/ingestion/dead_letter.py",
+      "sha256": "eb105b827fa17800cd7180b001ec77057693989c9cd7bc503a91f09858ba8299",
+      "git_blob": "704159498be7e925868cae60f883e7b952c4010a"
+    },
+    {
+      "original_path": "butler/awareness/ingestion/mqtt_client.py",
+      "sha256": "aaf8c76c4a3c69e2e43d00dbec0726b11375591a9b482f24458dbbcc73e71227",
+      "git_blob": "c5a71a5cde63c812af0823247817d65ed393a82e"
+    },
+    {
+      "original_path": "butler/awareness/ingestion/normalization.py",
+      "sha256": "e366b51b2e8a77064dfe004050ebe5b7e3efbb2eec9289fdd5bff85844ea2b4a",
+      "git_blob": "969fd18dcddd79ae5928d5813f520d02e2140f79"
+    },
+    {
+      "original_path": "butler/awareness/ingestion/pipeline.py",
+      "sha256": "14e5490a04baeb31be91ce7dc4b2955fb053e2787bb8084ee752f867f86d471d",
+      "git_blob": "434232b837d281b5e5d3d3aaa8e89b25ffcbea83"
+    },
+    {
+      "original_path": "butler/awareness/ingestion/sequence.py",
+      "sha256": "48bcb350dc7e8ef1c29914e56dceb89cb76b9d1ad3f188c23a6a7292ca941bb1",
+      "git_blob": "c2312228360320ce170a487799eb85288941de74"
+    },
+    {
+      "original_path": "butler/awareness/ingestion/service.py",
+      "sha256": "7daf45a083657ca08a43103b0a33cef51c25777a3fda1a0a48aa83680d14674d",
+      "git_blob": "45acdb4f222f364ab3d82daecae3d979c0348076"
+    },
+    {
+      "original_path": "butler/awareness/logging_utils.py",
+      "sha256": "b03afb42e5cc5224da526d0fb583e1e41c9dc85a70fcb11f6ea30ce3b5133d49",
+      "git_blob": "98333aebfe23b6beb267879396d0e3ad3eaf487e"
+    },
+    {
+      "original_path": "butler/awareness/memory/__init__.py",
+      "sha256": "64765d776be261f7de03bbc643172608e493a6ba2d03af91f0c4417104e6b83d",
+      "git_blob": "f0190e3a9a411e78f4f39e5dd8b324873080d7f2"
+    },
+    {
+      "original_path": "butler/awareness/memory/embeddings.py",
+      "sha256": "d3a1729c756e892214793dcab05d8034b646fda522423b7a62aa445e1598a895",
+      "git_blob": "e386fd8342a625a47782e969241155c3f3c74ecc"
+    },
+    {
+      "original_path": "butler/awareness/memory/service.py",
+      "sha256": "4793d7e260a29a83463290c78d5c4b77bbd6d5b716154fc5ce27677790e2a9b5",
+      "git_blob": "6fde4cf62c783944834012e600a1bcf3fb6759a2"
+    },
+    {
+      "original_path": "butler/awareness/notifications/__init__.py",
+      "sha256": "0b0a02b34fe81b0e4b3691506f082746927591e7a8c6b8e08274c88a2d3a6f47",
+      "git_blob": "a7ceb4a6c4adca533613dab98b0faa9ae1552263"
+    },
+    {
+      "original_path": "butler/awareness/notifications/adapters.py",
+      "sha256": "e6e6a722ae8879183303d864437a6da748bbf026a7694075c9632660ad595041",
+      "git_blob": "51c83cd88455960e735db06159198acfedb08899"
+    },
+    {
+      "original_path": "butler/awareness/notifications/base.py",
+      "sha256": "d83ae1830f14b5d5ca44148ae8aa5c17c36bd3c05b78cee2eede8016a6d40c8c",
+      "git_blob": "18b227b858a9eda9c65613c4e67bea17b672be7a"
+    },
+    {
+      "original_path": "butler/awareness/notifications/handler.py",
+      "sha256": "12e2bab0e758861b6f7221a57c199c076e19c46734502fe311864e24702694f7",
+      "git_blob": "af0dc661f4a984684cd475a283cff2147583ddd7"
+    },
+    {
+      "original_path": "butler/awareness/outbox/__init__.py",
+      "sha256": "56bc61f50d0b562216ed9a783422fa52394515c0ef8239298ec5e3df7bbf41e3",
+      "git_blob": "4badf8a4aab09fdf7f7afe3da63caa578884042f"
+    },
+    {
+      "original_path": "butler/awareness/outbox/worker.py",
+      "sha256": "6b5f0c4c75ffd7cf9049736c10fc2020a1f814b86cbef7be6f8f971369c9a01f",
+      "git_blob": "748eb4c806eb566c407e27f37b16f22409082293"
+    },
+    {
+      "original_path": "butler/awareness/README.md",
+      "sha256": "b7effdb78c6181b6cfb2e182f46287d43303f915e7e824d4fa13a9c4767e453c",
+      "git_blob": "2cd349b873afad8add091d2eb03f6b4255473fcf"
+    },
+    {
+      "original_path": "butler/awareness/registry/__init__.py",
+      "sha256": "c66222ca3390ed5656c1b493f8a74c2f60ed6e105d2a77be32b89e40b9d72bf1",
+      "git_blob": "23dff4396eb60a7be7cd0ace758c1cd608e9f10f"
+    },
+    {
+      "original_path": "butler/awareness/registry/bootstrap.py",
+      "sha256": "bee8aae06fbabaa24a454919286e2079e3e5172aa38519690040583aa7b60014",
+      "git_blob": "986ba0b4901c568f2ece96c419fafc398a84074a"
+    },
+    {
+      "original_path": "butler/awareness/registry/sources.py",
+      "sha256": "c6c6ade05f4107dc7771c59b524a060f94c44cdc45199654893c2b2d73240812",
+      "git_blob": "6998f873c31795b9e893990932ecf631452808fb"
+    },
+    {
+      "original_path": "butler/awareness/reminders/__init__.py",
+      "sha256": "db8902ebaa045f0b49ac8e483bd9d1a3b0092fa753c7e2d99680152d4f12d21d",
+      "git_blob": "52c84e76382afad75ac93626117365b32b9b298f"
+    },
+    {
+      "original_path": "butler/awareness/reminders/service.py",
+      "sha256": "90db634021c9a454e440b56b722061c9ff5a043280d097342778f5a662537ee1",
+      "git_blob": "81082cff3f49f94a1132e5403a02604c74766bdc"
+    },
+    {
+      "original_path": "butler/awareness/reminders/worker.py",
+      "sha256": "418fb044a6b5d6802ec765e4bd9763087df4af2d933d0a18f9dd66858b145cb1",
+      "git_blob": "50ab7f8854a0253c2d0eb18e9692ba0af016e9c0"
+    },
+    {
+      "original_path": "butler/awareness/retention/__init__.py",
+      "sha256": "2f54f73a8dd279b4fa3973e93a2909d36e68857d012edc3b5ee39094e9a4f4c7",
+      "git_blob": "483c957b5041deeb715032a17f478612570d9596"
+    },
+    {
+      "original_path": "butler/awareness/retention/service.py",
+      "sha256": "d375259a6568626c74525a403758b29af143eecb01c526a18adc05be57d372be",
+      "git_blob": "f1e682bc37597537d3a58ab8c4580b66481b614f"
+    },
+    {
+      "original_path": "butler/awareness/rules/__init__.py",
+      "sha256": "c26cc3defb39a9bb29bb3327abeaf56b39a889817fda46fa8e4fed11f6bc3412",
+      "git_blob": "535c6b26766119f6cefb2dd811db4d034dbe1855"
+    },
+    {
+      "original_path": "butler/awareness/rules/engine.py",
+      "sha256": "4a88de76704cb40e0dd376513c14708cdaf45fff86ab966655faaa0fc21d5b47",
+      "git_blob": "04714d298d03ec4a134832f48e57ee354312555f"
+    },
+    {
+      "original_path": "butler/awareness/rules/policy.py",
+      "sha256": "dddf7c01ed52ec802044ea9775c62d0fdfe4a1de1e4417e0b6589d8b0de6c0cd",
+      "git_blob": "b780da849afd088662ecb906a5ce79ed901d92e6"
+    },
+    {
+      "original_path": "butler/awareness/rules/rules.toml",
+      "sha256": "92102615f23aad359f2abb1a15b8c194c3bf37b4f442b88ee4a3f7997c86333b",
+      "git_blob": "a9cc8485025e2046d00a3bc91d13cd90a9cb484d"
+    },
+    {
+      "original_path": "butler/awareness/schemas/__init__.py",
+      "sha256": "fcf88c3a9c6005edbdd5c8345508294ccc632d7998e2232eae184139620c13cb",
+      "git_blob": "7ab0080d4f2add962327b8722d3ce2b74a5fcc77"
+    },
+    {
+      "original_path": "butler/awareness/schemas/events.py",
+      "sha256": "5bd62aea9e6713daab64c7f34bde62acff2aac1e41558680db8fe10c5467b138",
+      "git_blob": "bea625306674d0d1caa0062d815d9f02fcacbc00"
+    },
+    {
+      "original_path": "butler/awareness/simulator/__init__.py",
+      "sha256": "b3f9086533ed0a8f92c400a937f78daba74795f0d187207984abc46363b0a711",
+      "git_blob": "b4432669e54d65ee131b192de8516a15d0a84368"
+    },
+    {
+      "original_path": "butler/awareness/simulator/__main__.py",
+      "sha256": "6978cf92cd5ca8fb8ca0cdcdb200cb8084f66dc9923c299838675184324916d1",
+      "git_blob": "6ce53b4dbe1f62f113499df3f11206b1f4919a0f"
+    },
+    {
+      "original_path": "butler/awareness/simulator/publisher.py",
+      "sha256": "66cb93adeb33cbb766b1f1495d6661501cc5dfd3f651f181f394ab6d708e001c",
+      "git_blob": "da55c334b3e3bd568f7e7c6051d6d8e915c63045"
+    },
+    {
+      "original_path": "butler/awareness/state/__init__.py",
+      "sha256": "aea5843567316926a348dad8ff0b7071305acaab8f8a38c04df17f4326ff4a96",
+      "git_blob": "b3b160166c2ced829c079c3fe586ac63c0246755"
+    },
+    {
+      "original_path": "butler/awareness/state/classification.py",
+      "sha256": "161b2ac2a29782cfbe3597696c38faeee82bdeca194fb2f09078fa7f584c2770",
+      "git_blob": "eb509cca5ed1fa0cc9d2028594a4512a6bdc642d"
+    },
+    {
+      "original_path": "butler/awareness/state/freshness.py",
+      "sha256": "693e44105d991d4049e9ebd12ce353f6a2be3ed954d21b285154366f6d788887",
+      "git_blob": "a455ccd1c44843fd869acb3b1c01478c88ffd8a0"
+    },
+    {
+      "original_path": "butler/awareness/state/manager.py",
+      "sha256": "9bdc4d76abdbd8a561a980a4298ac7cf1878f3b31f52a6c1c22ffa9df91f77fb",
+      "git_blob": "12c248fe39a5e15d3d9069f16d7c76c6e44b8a23"
+    },
+    {
+      "original_path": "butler/launcher/awareness_clear.py",
+      "sha256": "dc4a37b5dfd89f41debc83d4db172723afcf79c225a25b40874d1bc0342bcdd5",
+      "git_blob": "11deac4796315ea4445f77997cb5da67658d6103"
+    },
+    {
+      "original_path": "butler/mcp_servers/providers/awareness.py",
+      "sha256": "94b24accb0557dac2991f2f4e0c93c3939f7bdea552aa16d98f266972ecdfe32",
+      "git_blob": "662fd0419c5320a3b6ea385d80e667e2ca439e93"
+    },
+    {
+      "original_path": "butler/services/awareness_client.py",
+      "sha256": "08dd1039efd66e726f8cd98aa0d5c7e448ea719b933270a5e14c0c9fa0de7f7d",
+      "git_blob": "b9cdcbbc47ce60453b7ad2735f8397dd47a7d769"
+    },
+    {
+      "original_path": "butler/services/awareness_signals.py",
+      "sha256": "7f4c35f280e21f661b12d913eeb3e850a7635c5b085d7aa280b2cdef55d96361",
+      "git_blob": "3951655d61f90d303e9b3c8c40f2d8555d92cece"
+    },
+    {
+      "original_path": "docker/mosquitto-test.conf",
+      "sha256": "0a4ba5331a7bcaf04c8e64bbacd317f415b851bbe726b8713a78ed82df57b0f5",
+      "git_blob": "d9f947c7c433d3b2a2607cdbc028be5c3e944bca"
+    },
+    {
+      "original_path": "docker-compose.awareness.yml",
+      "sha256": "545cbc1d4719768e4f49a0e317719af389f5c0e9a4e9c1e17e8e35007e039c9d",
+      "git_blob": "716ea02493d29f30501cb2589676f24cfb535fd8"
+    },
+    {
+      "original_path": "requirements/awareness-py312.txt",
+      "sha256": "e98b2744ef6699aa33a62390a33f2d2c34815d8f020295eda87806d13b987561",
+      "git_blob": "1b02bf6ac9f72cdf058d3e24a9b332467f571f54"
+    },
+    {
+      "original_path": "tests/test_awareness_actions_integration.py",
+      "sha256": "bb48f1061275bd901418e362c75169daca177c50889864555fcece5365adcdfb",
+      "git_blob": "8eea6d8e7fcfed10362263db2f48b73f6b37e1d7"
+    },
+    {
+      "original_path": "tests/test_awareness_actions_unit.py",
+      "sha256": "536a9e6d117f5eac7ad0352cd738783961ae275b4d0e57806f553d8cbe152842",
+      "git_blob": "29fd5787ec853241c72d362a425a0ba02faae3cd"
+    },
+    {
+      "original_path": "tests/test_awareness_alerts_integration.py",
+      "sha256": "f4160284f52ad90006c380502f1cb7397f4e80987db3a3911289b80c00ab5c7a",
+      "git_blob": "d60b7df5b1fda8031ae4ed7d86b1217b3942a302"
+    },
+    {
+      "original_path": "tests/test_awareness_briefing_delivery.py",
+      "sha256": "7cab0b8ab02e3abfb9fb4811397e0951803ad0972acfa30efbb4dd89b6329357",
+      "git_blob": "bd60ac46977a2b3d4b83b5b4957c5f7048eca370"
+    },
+    {
+      "original_path": "tests/test_awareness_briefing_integration.py",
+      "sha256": "9e968a1996a78f832387b2508e9151ac9f7e05685665b35fd3f38583e7370fd2",
+      "git_blob": "edfa0264f60b3cab9aa06b176f6b72601cf450a2"
+    },
+    {
+      "original_path": "tests/test_awareness_briefing_selection.py",
+      "sha256": "a9d0bf205db3fe9a88cdd86627fdf5a6acefc4eacd3b15864e751448c4f1d4c0",
+      "git_blob": "7b31100a30231da9d8f9b084c4883aa96f9e3dd2"
+    },
+    {
+      "original_path": "tests/test_awareness_briefing_speech.py",
+      "sha256": "8e572bf04d9be9b12779be4fdde7b27bab8f10f881cb2df5f06ccec517e4da74",
+      "git_blob": "f0ae024e687889c86679d31f28e015ec4d025010"
+    },
+    {
+      "original_path": "tests/test_awareness_briefing_unit.py",
+      "sha256": "2c650bb13ca40d023502be626675202be6792e1c521b978e440e45f14ea029fe",
+      "git_blob": "dc4f0dcd5b7ac7332284d7230479ce4fff1999f7"
+    },
+    {
+      "original_path": "tests/test_awareness_client_and_provider.py",
+      "sha256": "a9dda5cd458398a57fa72228aa26c901ddd028c590ae7e9260aab9fbe0ce7810",
+      "git_blob": "8b524570b9b1a09050e46f67f5bbf27a999f85f0"
+    },
+    {
+      "original_path": "tests/test_awareness_config.py",
+      "sha256": "f4b2ca089069958ef9c5033a62de9906c612d918755bcb9184523692fff1750b",
+      "git_blob": "5dd2d8028c8164ae70e20b1d4c083a7ccd4caa42"
+    },
+    {
+      "original_path": "tests/test_awareness_context_integration.py",
+      "sha256": "f1b8764e4619df99ce1c6fb37c4145ff72ae86c124818db05d5378163d1f7cda",
+      "git_blob": "ee68f6b679eb77ef16664c72d8f1fef01f1bfb88"
+    },
+    {
+      "original_path": "tests/test_awareness_context_unit.py",
+      "sha256": "6439ab6f16cc31e7cfba0a8f3608cad4f41cac687ebd4d79e2dac48b5543a04f",
+      "git_blob": "0a870c460b56e1730cc4ea57aa75c500bfd58c87"
+    },
+    {
+      "original_path": "tests/test_awareness_entrypoint.py",
+      "sha256": "965e250aee96b0f9d1008fc8745aeec840b541ebfc5a2065f7a26ea1a5176fce",
+      "git_blob": "77307003a73c2d085f34b0fd9efdba38775fc5ac"
+    },
+    {
+      "original_path": "tests/test_awareness_event_schema.py",
+      "sha256": "0cad77bef2ce4849b743bb8945d19c056615e43ed1d4a6fc9bfe58f63545e0eb",
+      "git_blob": "818374cb8fb3ab833b769e433ef6b52191c506cf"
+    },
+    {
+      "original_path": "tests/test_awareness_hardening_integration.py",
+      "sha256": "5656dbb3940476816d23d95fc9633c20f5e3d14b557e5af5cb430745536e9eea",
+      "git_blob": "dafb534fc4eafaeb434dab57c5680d625343302e"
+    },
+    {
+      "original_path": "tests/test_awareness_health.py",
+      "sha256": "280d6afab42aa39e10ff44a34beef0ff247d62d4b86ad14b68a3d784f2b9ced1",
+      "git_blob": "e82a94600255011c8621b23eba1a4ae7892b7ad4"
+    },
+    {
+      "original_path": "tests/test_awareness_ingestion_integration.py",
+      "sha256": "5236ba81b839c6058bf50ad59fcce71db9c6514815339f9335dac2ee5b71e25b",
+      "git_blob": "3bd44b9f3ff31654b17405543b743175a4274593"
+    },
+    {
+      "original_path": "tests/test_awareness_ingestion_unit.py",
+      "sha256": "bc143b9c70eab295e2a42e73bb210cc2afebf68c2f95024032d60910da995db4",
+      "git_blob": "3bddc90e5b3fcac5708d6d823c6acb3b07c35348"
+    },
+    {
+      "original_path": "tests/test_awareness_memory_integration.py",
+      "sha256": "fb0ff97776cecc39bc89efe5abafe043bc0dc8281401b9292d3a80ebd75321f6",
+      "git_blob": "46ced86be9188dc96ec5ffaede82058435a14c3c"
+    },
+    {
+      "original_path": "tests/test_awareness_metrics_memory.py",
+      "sha256": "3a0d27b7caf3b26c58b04081db6c84a59de712699fe8fde6f6c6e38c311bd69c",
+      "git_blob": "bd3e18d1c5cfb6aa79f9af57c98707844e2f8289"
+    },
+    {
+      "original_path": "tests/test_awareness_migrations.py",
+      "sha256": "070454bf09118edfe34a01bb7e533aee474bf7f6620e59eba940702644d82efc",
+      "git_blob": "61e15da8bacd6955833e4b6f1cd1b3b28a12ab89"
+    },
+    {
+      "original_path": "tests/test_awareness_morning_context.py",
+      "sha256": "f5616257abe03f64eb2d28cfbd31d6f24c9c452855eb89ab05dcdecd9a1a2339",
+      "git_blob": "a07cd77f44e40c92e66872a932b99da3ad63131b"
+    },
+    {
+      "original_path": "tests/test_awareness_presence_integration.py",
+      "sha256": "41dac1a477949b5cf52307cd5ef57ea8219fff6d3493d1596d055fce8cf86b4e",
+      "git_blob": "45c23bdc4bdfa5b3eb04549f8a064cd07e72450f"
+    },
+    {
+      "original_path": "tests/test_awareness_reminders_integration.py",
+      "sha256": "1072fcdb860ec6f72727221bc659c47e3e1bc9fcd15ff227d38fdaa51b4c5327",
+      "git_blob": "bf4a380e1343a5d20e3dfb5873aa4ed330cfde75"
+    },
+    {
+      "original_path": "tests/test_awareness_rules_unit.py",
+      "sha256": "e757de84209d4e83a3f1b0ee4bd8c85c4188bc343f98ef566211ea24970d1e8f",
+      "git_blob": "85ecfcb2ae434d098ba46e04ec6400da897efc0e"
+    },
+    {
+      "original_path": "tests/test_awareness_signals_unit.py",
+      "sha256": "d55063347548b813825d2fe6a465c4e854c0ac1b1f8bd325d4fc5fb95ad01d0f",
+      "git_blob": "b69456db6f13ff01a5ae8fbac91faa578243896a"
+    },
+    {
+      "original_path": "tests/test_awareness_state_integration.py",
+      "sha256": "2f94e87faf0c95036952a8954f0d96787bec622ec880b1ee61d4ebfb98c91343",
+      "git_blob": "b7e715ef93cf1bcae99d968f2389959799aaab8e"
+    },
+    {
+      "original_path": "tests/test_awareness_state_unit.py",
+      "sha256": "8f582eec4bb99c27bab197971462d6030b6aa2f091f2ae05cd47f22fbe02687d",
+      "git_blob": "b8d763e6c92e817c8cadafa7ca5a07957d49a4b0"
+    },
+    {
+      "original_path": "tests/test_home_automation_actions.py",
+      "sha256": "7da700c5502ae7f406e0343f55b2ceef45d636a82ba1c2cd703aa6e187e6c901",
+      "git_blob": "70471e75d40397057696a7110a733be2b65bf868"
+    }
+  ]
+}

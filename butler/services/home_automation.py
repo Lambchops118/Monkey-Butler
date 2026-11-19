@@ -3,13 +3,11 @@ from __future__ import annotations
 import os
 import re
 from datetime import datetime
-from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
 
 from butler.config import load_environment
-from butler.services import awareness_client
 
 
 load_environment()
@@ -34,82 +32,10 @@ US_STATE_CODES = {
 ZIP_CODE_RE = re.compile(r"^(?P<zip>\d{5}(?:-\d{4})?)(?:\s*,\s*(?P<country>[A-Za-z]{2}))?$")
 
 
-def water_plants(
-    pot_number: int,
-    *,
-    idempotency_key: str | None = None,
-    correlation_id: str | None = None,
-) -> str:
-    if pot_number == 1:
-        pot_pin = 17
-    elif pot_number == 2:
-        pot_pin = 19
-    else:
-        # Legacy flat-topic path only. Legacy pins 16 and 18 have no
-        # owner-confirmed pot (qp_config.LEGACY_PIN_TO_CHANNEL), so pot 3
-        # deliberately has no legacy encoding — it is reachable through the
-        # canonical run_pump action instead.
-        raise ValueError(
-            "pot_number must be 1 or 2 on this legacy path; use run_pump "
-            "via request_device_action for pot 3"
-        )
-    return _request_device_action(
-        "water_plants",
-        {"pot_pin": pot_pin},
-        idempotency_key=idempotency_key,
-        correlation_id=correlation_id,
-    )
 
 
-def toggle_fan(
-    status: int,
-    *,
-    idempotency_key: str | None = None,
-    correlation_id: str | None = None,
-) -> str:
-    if isinstance(status, bool) or status not in (0, 1):
-        raise ValueError("status must be 0 or 1")
-    return _request_device_action(
-        "toggle_fan",
-        {"state": status},
-        idempotency_key=idempotency_key,
-        correlation_id=correlation_id,
-    )
 
 
-def _request_device_action(
-    action: str,
-    parameters: dict,
-    *,
-    idempotency_key: str | None,
-    correlation_id: str | None,
-) -> str:
-    """Route legacy tool names through the Phase 7 action boundary.
-
-    The response deliberately reports lifecycle state rather than claiming a
-    physical effect before device evidence arrives.
-    """
-    request_key = (idempotency_key or "").strip() or f"tool-{uuid4()}"
-    result = awareness_client.post_json(
-        "/actions/request",
-        {
-            "action": action,
-            "parameters": parameters,
-            "actor": "llm",
-            "correlation_id": correlation_id,
-            "idempotency_key": request_key,
-        },
-    )
-    if not result.get("accepted"):
-        raise RuntimeError(
-            f"Action request rejected: {result.get('reason', 'unknown reason')}"
-        )
-    request_id = result.get("action_request_id", "unknown")
-    status = result.get("status", "unknown")
-    return (
-        f"Action request {request_id} is {status}; physical completion is not "
-        "confirmed yet. Use get_action_status to verify acknowledgement and result."
-    )
 
 
 def get_current_datetime() -> str:

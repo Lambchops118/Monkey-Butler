@@ -1,6 +1,11 @@
 # Repository Agent Instructions
 
-These instructions apply to every coding-agent session in this repository. For the awareness and memory subsystem, start with [`docs/awareness-memory/IMPLEMENTATION_STATUS.md`](docs/awareness-memory/IMPLEMENTATION_STATUS.md).
+These instructions apply to every coding-agent session in this repository. The former awareness subsystem is archived under `archive/awareness/` and is not an active runtime dependency. For historical context and the retirement boundary, start with [`docs/awareness-memory/IMPLEMENTATION_STATUS.md`](docs/awareness-memory/IMPLEMENTATION_STATUS.md). Do not reactivate it or begin replacement systems without an explicitly assigned bounded task.
+
+For persistent storage changes, read [`docs/DATABASE.md`](docs/DATABASE.md).
+Use the shared `BUTLER_DB_PATH`, connection/migration layer and explicit table
+ownership. Do not add per-module runtime databases or delete the shared file to
+clear one module. Add tables only for assigned, implemented capabilities.
 
 For any new or modified agent-facing tool, read and follow
 [`docs/TOOL_IMPLEMENTATION_GUIDE.md`](docs/TOOL_IMPLEMENTATION_GUIDE.md).

@@ -102,7 +102,7 @@ class DebugDashboardDataTests(unittest.TestCase):
             connection = sqlite3.connect(db_path)
             connection.executescript(
                 """
-                CREATE TABLE messages (
+                CREATE TABLE conversation_messages (
                     id INTEGER PRIMARY KEY,
                     session_id TEXT,
                     role TEXT,
@@ -110,7 +110,7 @@ class DebugDashboardDataTests(unittest.TestCase):
                     created_at TEXT,
                     metadata_json TEXT
                 );
-                INSERT INTO messages VALUES
+                INSERT INTO conversation_messages VALUES
                     (1, 'voice', 'user', 'hello', '2026-08-10T00:00:00Z', '{"interaction_mode":"voice"}'),
                     (2, 'voice', 'assistant', 'hi', '2026-08-10T00:00:01Z', '{}');
                 """
@@ -409,11 +409,11 @@ class ModelMemoryInsightTests(unittest.TestCase):
             connection = sqlite3.connect(db_path)
             connection.executescript(
                 """
-                CREATE TABLE sessions (session_id TEXT);
-                CREATE TABLE messages (id INTEGER, created_at TEXT);
-                CREATE TABLE facts (scope TEXT, key TEXT, value TEXT, updated_at TEXT);
-                CREATE TABLE summaries (scope TEXT);
-                INSERT INTO facts VALUES ('user', 'units', 'PRIVATE-FACT', '2026-10-03');
+                CREATE TABLE conversation_sessions (session_id TEXT);
+                CREATE TABLE conversation_messages (id INTEGER, created_at TEXT);
+                CREATE TABLE conversation_facts (scope TEXT, key TEXT, value TEXT, updated_at TEXT);
+                CREATE TABLE conversation_summaries (scope TEXT);
+                INSERT INTO conversation_facts VALUES ('user', 'units', 'PRIVATE-FACT', '2026-10-03');
                 """
             )
             connection.commit()

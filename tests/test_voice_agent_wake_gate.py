@@ -55,7 +55,7 @@ class WakeGateTelemetryTests(unittest.TestCase):
             agent, "_acquire_transcript", return_value=f"{agent.WAKE_WORD}"
         ), mock.patch.object(agent, "emit_pipeline_event") as emit, mock.patch.object(
             agent, "_signal_wake_cue"
-        ), mock.patch.object(agent, "awareness_signals"):
+        ):
             agent._process_recognition_audio(_FakeAudioData())
 
         rejected = [c for c in emit.call_args_list if c.kwargs.get("event") == "voice_turn_rejected"]
@@ -67,7 +67,7 @@ class WakeGateTelemetryTests(unittest.TestCase):
             agent, "_acquire_transcript", return_value=f"{agent.WAKE_WORD}, turn off the desk lamp"
         ), mock.patch.object(agent, "emit_pipeline_event") as emit, mock.patch.object(
             agent, "_signal_wake_cue"
-        ), mock.patch.object(agent, "awareness_signals"), mock.patch.object(
+        ), mock.patch.object(
             agent, "_command_executor"
         ) as executor:
             agent._process_recognition_audio(_FakeAudioData())

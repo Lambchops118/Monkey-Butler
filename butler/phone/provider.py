@@ -41,6 +41,7 @@ class PhoneConfig:
     bridge_sync_limit: int
     main_notify_url: str = ""
     main_notify_token: str = ""
+    # Constructor compatibility only; from_env/runtime storage uses BUTLER_DB_PATH.
     db_path: str | None = None
 
     @classmethod
@@ -60,7 +61,6 @@ class PhoneConfig:
             bridge_sync_limit=max(1, env_int("BUTLER_PHONE_BRIDGE_SYNC_LIMIT", 25)),
             main_notify_url=os.getenv("BUTLER_PHONE_MAIN_NOTIFY_URL", "").strip().rstrip("/"),
             main_notify_token=os.getenv("BUTLER_PHONE_PUSH_TOKEN", "").strip(),
-            db_path=os.getenv("BUTLER_PHONE_DB_PATH", "").strip() or None,
         )
 
 

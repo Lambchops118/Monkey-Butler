@@ -22,7 +22,7 @@ from butler.jobs import get_default_job_store
 from butler.messages import AnnouncementPayload, EventPayload, Message, TextPayload
 from butler.router import interaction_mode_for_source, request_uses_background, turn_context
 from butler.mcp_client import peek_local_mcp_status
-from butler.services import awareness_client, awareness_signals, sleep_mode
+from butler.services import sleep_mode
 from butler.telemetry import emit_pipeline_event
 
 
@@ -50,9 +50,8 @@ def _query_int(query: dict[str, list[str]], key: str, default: int) -> int:
 
 
 def _stream_state_snapshot(body: dict[str, Any]) -> str:
-    """Resolve the same awareness snapshot used by routed agent requests."""
-    legacy_snapshot = str(body.get("state_snapshot") or "no recent status")
-    return awareness_client.snapshot_with_fallback(legacy_snapshot)
+    """Preserve explicitly supplied legacy status without backend retrieval."""
+    return str(body.get("state_snapshot") or "no recent status")
 
 
 def _request_identity(body: dict[str, Any], client_ip: str) -> tuple[str, str]:
@@ -161,7 +160,6 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
                     "status": "healthy",
                     "queues": {
                         "central_depth": self.server.central_queue.qsize(),
-                        "awareness_signals": awareness_signals.stats(),
                     },
                     "display_clients": display_snapshot.get("clients", {}),
                     "mcp": peek_local_mcp_status(),
@@ -229,7 +227,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
         self._write_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "Not found"})
 
     def _handle_notify(self) -> None:
-        """Deterministic GUI banner for the awareness backend (no LLM).
+        """Deterministic GUI banner for authenticated producers (no LLM).
 
         The message goes through the router's ``ui`` lane into the display-state
         projection; 200 means enqueued for display, not seen by a human.
@@ -247,7 +245,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
             self._write_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "Missing 'title'."})
             return
 
-        # Callers like the awareness backend already tag the title with its
+        # Notification producers may already tag the title with its
         # severity; only add the tag when it is missing.
         banner_title = title if title.startswith("[") else f"[{severity.upper()}] {title}"
         self.server.central_queue.put(
@@ -306,7 +304,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
         # The morning briefing IS the wake-up message, so it ends sleep mode
         # before it is spoken rather than being silenced by it. Done here, at
         # the one door every backend announcement comes through, so the
-        # awareness subsystem needs to know nothing about sleep mode.
+        # producer needs to know nothing about sleep mode.
         if sleep_mode.is_wake_announcement(title) and sleep_mode.is_asleep():
             try:
                 sleep_mode.wake(reason="morning wake-up announcement")
@@ -577,7 +575,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
 
         snapshot_started = time.perf_counter()
         snapshot = _stream_state_snapshot(body)
-        awareness_snapshot_ms = round(
+        state_snapshot_ms = round(
             (time.perf_counter() - snapshot_started) * 1000.0, 1
         )
 
@@ -616,8 +614,8 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
 
         try:
             snapshot_event = {
-                "event": "awareness_snapshot_completed",
-                "awareness_snapshot_ms": awareness_snapshot_ms,
+                "event": "state_snapshot_completed",
+                "state_snapshot_ms": state_snapshot_ms,
             }
             emit_pipeline_event(
                 request_id=request_id,

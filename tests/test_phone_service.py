@@ -95,7 +95,7 @@ class PhoneServiceTests(unittest.TestCase):
             {
                 "BUTLER_PHONE_ENABLED": "1",
                 "BUTLER_PHONE_ALLOWED_OUTBOUND": "1",
-                "BUTLER_PHONE_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
+                "BUTLER_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
                 "BUTLER_PHONE_CONTACTS": json.dumps({"mom": "+15555550123"}),
                 "BUTLER_PHONE_ALLOWLIST": json.dumps(["+15555550123"]),
             },
@@ -110,7 +110,7 @@ class PhoneServiceTests(unittest.TestCase):
             {
                 "BUTLER_PHONE_ENABLED": "1",
                 "BUTLER_PHONE_ALLOWED_OUTBOUND": "1",
-                "BUTLER_PHONE_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
+                "BUTLER_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
                 "BUTLER_PHONE_ALLOWLIST": json.dumps(["+15555550123"]),
             },
             clear=False,
@@ -124,7 +124,7 @@ class PhoneServiceTests(unittest.TestCase):
             {
                 "BUTLER_PHONE_ENABLED": "1",
                 "BUTLER_PHONE_ALLOWED_OUTBOUND": "1",
-                "BUTLER_PHONE_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
+                "BUTLER_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
                 "BUTLER_PHONE_CONTACTS": json.dumps({"mom": "+15555550123"}),
                 "BUTLER_PHONE_ALLOWLIST": json.dumps(["+15555550123"]),
             },
@@ -179,7 +179,7 @@ class PhoneServiceTests(unittest.TestCase):
                 "BUTLER_PHONE_PROVIDER": "elevenlabs_twilio",
                 "BUTLER_PHONE_BRIDGE_URL": "https://bridge.example.com",
                 "BUTLER_PHONE_BRIDGE_TOKEN": "bridge-token",
-                "BUTLER_PHONE_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
+                "BUTLER_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
             },
             clear=False,
         ):
@@ -236,7 +236,7 @@ class PhoneServiceTests(unittest.TestCase):
             os.environ,
             {
                 "BUTLER_PHONE_PROVIDER": "elevenlabs_twilio",
-                "BUTLER_PHONE_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
+                "BUTLER_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
             },
             clear=False,
         ):
@@ -279,7 +279,7 @@ class PhoneServiceTests(unittest.TestCase):
             os.environ,
             {
                 "BUTLER_PHONE_PROVIDER": "elevenlabs_twilio",
-                "BUTLER_PHONE_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
+                "BUTLER_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
             },
             clear=False,
         ):
@@ -375,7 +375,7 @@ class PhoneCallMemoryTests(unittest.TestCase):
                 os.environ,
                 {
                     "BUTLER_PHONE_PROVIDER": "elevenlabs_twilio",
-                    "BUTLER_PHONE_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
+                    "BUTLER_DB_PATH": str(Path(tmpdir) / "phone.sqlite3"),
                     "BUTLER_MEMORY_ENABLED": "1",
                 },
                 clear=False,

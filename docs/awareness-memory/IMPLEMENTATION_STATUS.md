@@ -1,5 +1,47 @@
 # Implementation Status
 
+## Current bounded cleanup - retired launcher controls (2026-11-18)
+
+Removed missed Awareness/MQTT and situation-snapshot controls, their load/save
+wiring/defaults, and obsolete settings reintroduced by launcher saves. Active
+conversation-memory controls remain, relabeled as history plus saved facts in
+the unified SQLite store. Launcher tests: 29 passed, including headless full
+widget construction and settings persistence. Reopen the launcher to load the
+updated UI; no live GUI, model or hardware acceptance ran. Stop at cleanup.
+
+## Current bounded implementation - unified application SQLite (2026-11-18)
+
+Owner authorized a clean shared database without old-data import. Conversation,
+jobs and phone stores now use `db/butler.sqlite3` / `BUTLER_DB_PATH`, a shared
+connection policy and atomic versioned startup migrations. Conversation tables
+are namespaced; clearing them preserves other owners and the schema ledger.
+Dashboard reads follow the same path. The clean local file was initialized and
+integrity-checked; old files were left untouched. See [DATABASE.md](../DATABASE.md)
+for ownership, exact validation (170 passed) and cutover. Restart running
+processes to use it. Stop at shared storage; no Devices or future-system tables
+were created, and no OS startup service was installed.
+
+## Current consultation - Devices design and awareness retrospective (2026-11-18)
+
+Owner selected Devices as the first bounded replacement subject. Added
+[Devices design](../DEVICES_SYSTEM_DESIGN.md) and
+[awareness retrospective](../AWARENESS_RETROSPECTIVE.md). The proposed scope is
+registry, qualified observations/current state, communication health, structured
+reads and a bounded per-turn summary within Butler's lifecycle. Storage and
+adapter/read-tool details remain proposals; no replacement runtime, migrations,
+dependencies, hardware actions or restored pump/fan controls were implemented.
+Stop at design/discovery; implement only a separately assigned bounded increment.
+
+## Current state — awareness archived (2026-11-18)
+
+The owner authorized retirement on this branch. Awareness is disconnected from
+Butler startup, active tool registration, context/signal/memory calls, and
+maintenance controls. See [retirement report](RETIREMENT_2026-11-18.md) and
+[archive](../../archive/awareness/README.md). Conversation history and SQLite
+saved facts remain active. Older sections below are historical, not current
+capability claims. Stop at archival; replacement systems require a separately
+bounded owner assignment.
+
 This file reports implementation state, not documentation availability.
 
 ## Current bounded repair — pump liveness and action truthfulness (2026-11-14)
@@ -494,3 +536,7 @@ Source investigation completed in [PER_TURN_AWARENESS_2026-11-18.md](PER_TURN_AW
 ## Follow-up consultation — observed snapshot effectiveness (2026-11-18)
 
 Expanded [PER_TURN_AWARENESS_2026-11-18.md](PER_TURN_AWARENESS_2026-11-18.md) with live read-only probes and five saved model-input files. Injection is proven in 111/126 sampled model requests, but historical announcements occupied approximately 65–73% of older snapshot text and selected device facts were limited to stale legacy pump/fuse fields. Today's 12 sampled requests had no snapshot; live capabilities report database unreachable and the configured Docker engine is unavailable. Four selection tests and eight client/provider tests passed in their appropriate environments. No runtime repair/restart/action; stop at diagnosis.
+
+## Current consultation — awareness capability map (2026-11-18)
+
+Added [CAPABILITY_MAP_2026-11-18.md](CAPABILITY_MAP_2026-11-18.md): component responsibilities, external boundaries, concrete inputs, dependency chain, and implemented-versus-proven limitations. Documentation/source inspection only, no new tests/probes or runtime changes. Stop at overview; archiving/removal/replacement remains unassigned.

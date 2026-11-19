@@ -361,45 +361,8 @@ class Supervisor:
             return
         self._wait_port("ollama", "127.0.0.1", self._ports.ollama, timeout=60, managed=managed)
 
-    def _start_awareness_db(self) -> None:
-        if not self._cfg.manage_docker:
-            self._say("manage_docker is off; assuming Postgres is already up.")
-            return
-        self._say("bringing up awareness Postgres container (docker compose)...")
-        # Synchronous: --wait blocks until the container is healthy.
-        result = self._run_blocking(
-            ["docker", "compose", "-f", config.DOCKER_COMPOSE_FILE, "up", "-d", "--wait"],
-            name="docker",
-        )
-        if result != 0:
-            self._say(
-                "WARNING: docker compose exited non-zero; awareness may fail to connect."
-            )
 
-    def _run_migrations(self) -> None:
-        if not self._cfg.run_migrations:
-            return
-        py = venv_python("awareness")
-        self._say("running awareness database migrations...")
-        self._run_blocking(
-            [str(py), "-m", "butler.awareness", "migrate"],
-            name="migrate",
-            env=_venv_env(_base_env(), py),
-        )
 
-    def _start_awareness(self, base: dict[str, str]) -> None:
-        py = venv_python("awareness")
-        env = _venv_env(base, py)
-        managed = self._spawn("awareness", [str(py), "-m", "butler.awareness", "serve"], env)
-        if managed is None:
-            return
-        self._wait_port(
-            "awareness",
-            self._ports.awareness_host,
-            self._ports.awareness,
-            timeout=45,
-            managed=managed,
-        )
 
     def _start_main(self, base: dict[str, str]) -> None:
         py = venv_python("main")
@@ -620,11 +583,6 @@ class Supervisor:
         # component checkbox (it would only waste VRAM/startup time).
         if self._cfg.start_ollama and not self._cfg.use_api_models:
             self._start_ollama(base)
-        if self._cfg.start_awareness_db:
-            self._start_awareness_db()
-        if self._cfg.start_awareness:
-            self._run_migrations()
-            self._start_awareness(base)
         if self._cfg.start_main:
             self._start_main(base)
         if self._cfg.start_display:
@@ -699,8 +657,6 @@ def run_headless(cfg: LauncherConfig, log: Optional[LogFn] = None) -> int:
     supervisor.start()
     if not supervisor.is_running() and not any(
         [
-            cfg.start_awareness_db,
-            cfg.start_awareness,
             cfg.start_main,
             cfg.start_display,
             cfg.start_voice,

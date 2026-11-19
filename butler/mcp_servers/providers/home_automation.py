@@ -22,24 +22,3 @@ def register(server: FastMCP) -> None:
         place.
         """
         return actions.get_current_weather(location)
-
-    @server.tool()
-    def water_plants(pot_number: int, idempotency_key: str = "") -> str:
-        """DEPRECATED legacy path that can only reach pot 1 or 2. Prefer
-        request_device_action with run_pump, which covers every connected pot
-        (channel 1 = pot 1 Monstera, 2 = pot 2, 3 = pot 3 Philodendron). This
-        tool's 2-pot limit is a limitation of the old flat-topic firmware
-        contract, NOT a limit of the watering system: never tell the user a pot
-        is unsupported because it is outside this tool's range. Returns an
-        audited lifecycle status, not an immediate claim of physical success.
-        Reuse idempotency_key when retrying the same user intent."""
-        return actions.water_plants(
-            pot_number, idempotency_key=idempotency_key or None
-        )
-
-    @server.tool()
-    def toggle_fan(status: int, idempotency_key: str = "") -> str:
-        """Request the registered fan action (1=on, 0=off). This returns an
-        audited lifecycle status; reuse idempotency_key for a retry of the
-        same intent."""
-        return actions.toggle_fan(status, idempotency_key=idempotency_key or None)

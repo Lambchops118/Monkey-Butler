@@ -28,7 +28,7 @@
 
 B.U.T.L.E.R. is a local-first, voice-first AI assistant for conversation, home
 automation, and engineering work. It combines local language-model inference,
-speech recognition and synthesis, durable memory, environmental awareness, and
+speech recognition and synthesis, conversation memory, home integrations, and
 an extensible tool system. The launcher supervises the cooperating services
 that make up a full deployment.
 
@@ -40,9 +40,8 @@ that make up a full deployment.
 </p>
 
 - Hold voice or text conversations through an OpenAI-compatible local model
-- Remember conversations and retrieve evidence-backed long-term context
-- Track household presence, state, alerts, and proactive briefings
-- Control registered MQTT devices and other home-automation integrations
+- Remember conversations and explicitly saved facts in the local SQLite store
+- Control configured smart switches and other independent integrations
 - Use MCP tools for local services, files, KiCad, and Minecraft diagnostics
 - Run durable background jobs without blocking the foreground conversation
 - Accept text commands over a private Tailscale connection
@@ -58,8 +57,6 @@ The current implementation uses several independently deployable processes:
 | --- | --- |
 | Main service (`python -m butler`) | Router, scheduler, agent runtime, memory, MCP client, text/SMS servers, and display-state projection |
 | Room voice worker (`python -m butler.voice.worker`) | Wake word, microphone capture, local STT, TTS playback, and proactive-speech endpoint |
-| Awareness API (`python -m butler.awareness serve`) | Presence, state, history, alerts, actions, briefings, and evidence-backed memory |
-| Awareness database | TimescaleDB/PostgreSQL with pgvector, managed through Docker Compose |
 | InfoPanel (`python -m butler.display.worker`) | Independently deployable pygame display client |
 | Ollama | Local model server used by the main service |
 
@@ -91,9 +88,8 @@ For the core text agent:
 Additional features require additional infrastructure:
 
 - Room voice: PortAudio-compatible audio hardware and libraries
-- Awareness: Docker with Compose and `requirements/awareness-py312.txt`
 - InfoPanel: `requirements/display-py312.txt`
-- Home automation and awareness ingestion: a reachable MQTT broker
+- Existing display/device MQTT integrations: a reachable MQTT broker
 - Validated room-audio and GPU-pinning deployment: Windows with NVIDIA GPUs
 
 Linux and macOS can run individual services, but the complete deployed stack is
@@ -113,14 +109,11 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements/runtime-py312.txt
 ```
 
-The separately deployable display and awareness API use focused environments:
+The separately deployable display uses a focused environment:
 
 ```bash
 python3.12 -m venv .venv-display
 .venv-display/bin/python -m pip install -r requirements/display-py312.txt
-
-python3.12 -m venv .venv-awareness
-.venv-awareness/bin/python -m pip install -r requirements/awareness-py312.txt
 ```
 
 On Windows, use the interpreters under `Scripts` instead of `bin`; for example:
@@ -163,9 +156,9 @@ Launch the supervised Windows control panel:
 .\Start-Butler.ps1
 ```
 
-The launcher can manage Ollama, the main service, room voice worker, display,
-awareness database/API, migrations, component selection, GPU assignment, and
-logs. For a console-only launch with the last saved component selection:
+The launcher manages Ollama, the main service, room voice worker, display,
+component selection, GPU assignment, and logs. Docker/PostgreSQL is no longer
+required for Butler startup. For a console-only launch with the last saved component selection:
 
 ```powershell
 .\Start-Butler.ps1 --no-gui
@@ -187,16 +180,19 @@ logs. For a console-only launch with the last saved component selection:
 .venv-runtime/bin/python -m butler.debug_dashboard
 ```
 
-Start the awareness service and database with:
+The former awareness subsystem is archived in
+[`archive/awareness`](archive/awareness/README.md). Its automatic household context,
+state/history tools, alerts, reminders, briefings, and registered pump/fan actions
+are retired pending separately scoped replacements. Existing databases, local
+conversation history, and hardware firmware have not been deleted or migrated.
 
-```bash
-docker compose -f docker-compose.awareness.yml up -d --wait
-.venv-awareness/bin/python -m butler.awareness migrate
-.venv-awareness/bin/python -m butler.awareness serve
-```
+## Application database
 
-See [the awareness service guide](butler/awareness/README.md) for configuration,
-migrations, health checks, and operations.
+Conversation history/saved facts, background jobs and phone records share
+`db/butler.sqlite3`, configured by `BUTLER_DB_PATH`. Butler creates and migrates
+it before its workers start; no database server or Docker is needed. Old separate
+SQLite files are not imported. Memory clearing affects conversation tables only.
+See [database ownership and migration guide](docs/DATABASE.md).
 
 ## Interfaces
 
@@ -256,7 +252,7 @@ Relevant variables are documented in `.env.example` and `settings.env`.
 
 Butler merges tools from one or more Model Context Protocol servers into a
 single capability surface. The built-in server provides home automation,
-awareness, and other local services. Optional servers can add:
+other local services. Optional servers can add:
 
 - General filesystem access with read-only defaults
 - KiCad assistance
@@ -286,7 +282,7 @@ submodule.
 
 ```text
 butler/                     Main application and service packages
-butler/awareness/           Awareness and long-term memory backend
+archive/awareness/          Retired source, migrations, deployment and tests
 InfoPanel/                  Pygame display modules and visual assets
 Peripherals/                MicroPython firmware and MQTT helpers
 docker/                     Container and test-broker configuration
@@ -327,7 +323,7 @@ development machine.
 Butler is under active development. Releases are created manually; the
 repository does not currently publish installers or binary artifacts. See the
 [implementation status](docs/awareness-memory/IMPLEMENTATION_STATUS.md) for the
-awareness subsystem's completed and planned phases.
+archived awareness subsystem's historical work; it is no longer active.
 
 This repository does not currently include an open-source license. Unless a
 license is added, the source is visible but no reuse rights are granted.

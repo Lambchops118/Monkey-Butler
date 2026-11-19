@@ -196,7 +196,7 @@ def start_scheduler(display_sink, central_queue=None):
         replace_existing = True,
     )
 
-    # Disabled: the morning wake-up report moves to the awareness subsystem.
+    # Retired legacy morning report; no replacement is scheduled here.
     # This job pushed a "Generate a morning report..." voice_cmd, which the
     # request classifier matched on "generate" and routed to a background job,
     # so 7:30 AM only ever spoke the background acknowledgement

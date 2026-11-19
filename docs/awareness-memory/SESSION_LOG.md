@@ -2074,3 +2074,121 @@ Current repository state: Existing unrelated modifications preserved; investigat
 Next permitted task: Separately assigned bounded diagnosis/repair, no automatic later-phase work.
 Required reading for next session: Investigation report, implementation status, architectural invariants; tool guide if tools change.
 Explicit stop point: Investigation complete; no restoration, snapshot-selection repair, or light-tool implementation begun.
+
+## 2026-11-18 — Awareness capability and boundary overview
+
+Session goal: Explain the subsystem's components, capabilities and limits.
+Current phase: Bounded documentation consultation.
+Bounded task completed: Mapped registry/ingestion, state/health/history, rules/alerts/delivery, reminders, context/tools, human signals, memory, actions, briefings and operations; distinguished external systems.
+Files added: CAPABILITY_MAP_2026-11-18.md.
+Files modified: IMPLEMENTATION_STATUS.md; SESSION_LOG.md.
+Migrations added: None.
+Decisions made: None.
+Assumptions confirmed or changed: Scope extends well beyond prompt context; registered action safeguards and reminder/notification workers depend on awareness, while Kasa control and SQLite conversation history are separate.
+Tests run: None; documentation/source/config inspection only.
+Tests passed: None run.
+Tests failed: None run.
+Commands not run: Live service checks, model/device requests, suites, restarts and deployment.
+Known limitations: Implemented features are not all production-accepted; database outage from preceding checks was not rechecked. Some README descriptions are historical; current code/config and observed evidence take precedence.
+Security implications: No secrets or physical actions.
+Deployment implications: None.
+Unresolved questions: Existing database/coverage questions remain; no new owner decision required for overview.
+Current repository state: Pre-existing modifications preserved; this task changes documentation only.
+Next permitted task: Separately assigned bounded work.
+Required reading for next session: Capability map, implementation status and per-turn investigation.
+Explicit stop point: Overview complete; no archival, removal, replacement or runtime implementation.
+
+## 2026-11-18 - Decouple and archive awareness
+
+Session goal: Retire the broad awareness subsystem for later scoped replacement.
+Current phase: Owner-authorized bounded archival, not a new implementation phase.
+Bounded task completed: Removed launcher/API/worker startup, awareness tool registration, signals, snapshot retrieval, fact mirroring, phone retrieval and dashboard polling; archived sources/deployment/tests and retired dependent pump/fan tools.
+Files added: archive/awareness/ (131 original versioned files, README, hash manifest, historical settings and mixed-module references); RETIREMENT_2026-11-18.md; tests/test_awareness_retirement.py. Pre-existing untracked CAPABILITY_MAP_2026-11-18.md remains.
+Files modified: Active launcher/config/GUI/maintenance, router/jobs, agent runtime, text/phone server, voice signal/telemetry code, MCP providers, clock/weather service, debug dashboard, scheduler comments, settings.env, .env.example, Start-Butler.ps1, README, AGENTS.md, active text/voice tests, docs/awareness-memory README/status/decisions/session log. Original awareness-only files moved to archive. Local ignored launcher.config.json had obsolete awareness flags removed.
+Migrations added: None; old migrations archived without execution.
+Decisions made: ADR-058, retire awareness while retaining conversational SQLite ownership and independent tools; no unsafe physical-action bypass.
+Assumptions confirmed or changed: Old persisted launcher flags cannot reactivate the retired services. The current tool catalog contains no awareness/reminder/pump/fan tools; independent light/clock/weather tools remain. Existing tool-history and action truthfulness guards remain defensive runtime behavior.
+Tests run: Exact commands/results in RETIREMENT_2026-11-18.md: 14 targeted discovery groups and a five-pattern combined loader run, compileall, JavaScript syntax, diff whitespace, source/import/archive-integrity inspection.
+Tests passed: 225 final passing cases; Python compilation, JavaScript syntax, whitespace and 131-file archive hash checks passed.
+Tests failed: One unchanged personality-text assertion expects wording absent from committed persona assets. Intermediate socket restrictions, a retired-signal mock and a UTF-8 editing error were corrected/retested as detailed in the report; no tests weakened.
+Commands not run: Full suite, archived subsystem suites, live model/audio/GUI acceptance, physical device actions, service restarts, database migration/export/deletion.
+Known limitations: Already-running processes retain old code until restarted; an old standalone awareness process is no longer supervised. Historical documentation links describe original paths. Personality test mismatch remains unrelated and unmodified. Smart-plug mocked async tests emitted warnings. Git submodule inspection remains sandbox-inaccessible.
+Security implications: Removed runtime callers and retired physical tools with their safety authority. No raw MQTT fallback, credential exposure, data deletion or firmware change.
+Deployment implications: Restart Butler and MCP children to load retirement; normal launcher startup has no awareness Docker/Postgres/API dependency. Existing DB/volumes/backups/venvs and .env credentials were preserved. Old standalone awareness processes require separate shutdown if still running.
+Unresolved questions: Existing snapshot/database questions are historical for the archived system. Replacement scope/design awaits a new assignment; unrelated personality assertion remains recorded.
+Current repository state: Changes are uncommitted on the owner's branch. Pre-existing documentation work retained. No submodule, data or environment modification.
+Next permitted task: Separately assigned bounded replacement work; no automatic scaffolding or next phase.
+Required reading for next session: Retirement report, archive README, ADR-058 and root AGENTS.md; tool guide for new/modified capabilities.
+Explicit stop point: Awareness archived and decoupled; no replacement implementation started.
+
+
+## 2026-11-18 - Devices scope design and awareness retrospective
+
+Session goal: Propose a streamlined Devices replacement and record why awareness was retired.
+Current phase: Bounded design/discovery consultation; no runtime implementation.
+Bounded task completed: Inspected existing Kasa configuration/service, display integration, main lifecycle, tool guide and archived-awareness evidence; documented scope, contracts, adapter/lifecycle ownership, state versus command semantics, summary policy and acceptance increments.
+Files added: docs/AWARENESS_RETROSPECTIVE.md; docs/DEVICES_SYSTEM_DESIGN.md.
+Files modified: docs/awareness-memory/IMPLEMENTATION_STATUS.md, DECISIONS.md, OPEN_QUESTIONS.md, SESSION_LOG.md.
+Migrations added: None.
+Decisions made: ADR-059 records the owner's Devices-first scope and distinguishes recommendations from approved implementation choices.
+Assumptions confirmed or changed: Coffee pot is a smart plug, not an observed brewing machine; six light configurations exist; kitchen screen reporting contract remains unverified and is distinct from the InfoPanel TV. Proposed per-turn summaries use background observations rather than per-turn network polling.
+Tests run: Documentation link/required-section checks and diff whitespace only (results reported in this session); no runtime tests.
+Tests passed: Documentation links/required sections and diff whitespace checks passed.
+Tests failed: None in this documentation task.
+Commands not run: Runtime/integration suites, real-model requests, live device polling/actions, service restart/deployment, database migrations or dependency installation.
+Known limitations: Design is proposed; configured devices were not contacted. Historical awareness findings are a bounded sample, not exhaustive operational history. Kitchen screen API and refresh/retention budgets require discovery.
+Security implications: No credentials copied into new documents. Proposed summary/read interfaces must honor existing caller access and provider disclosure boundaries; actuation safeguards remain mandatory.
+Deployment implications: None; existing retirement changes and process-restart requirement remain as previously documented.
+Unresolved questions: Kitchen screen integration, refresh/expiry policies, minimal schema/retention, MCP ownership bridge and measured prompt budget recorded in OPEN_QUESTIONS.md.
+Current repository state: Prior retirement modifications and untracked historical docs preserved; this task changes/adds documentation only.
+Next permitted task: Owner-assigned bounded Devices increment after design review; no automatic implementation.
+Required reading for next session: DEVICES_SYSTEM_DESIGN.md, AWARENESS_RETROSPECTIVE.md, current status, architectural invariants and tool guide if tools change.
+Explicit stop point: Devices design and awareness retrospective complete. No runtime scaffolding, action restoration, or other replacement system begun.
+
+
+## 2026-11-18 - Unified application database
+
+Session goal: Unify the three active SQLite stores for system-wide use with automatic initialization.
+Current phase: Owner-authorized bounded storage implementation; no replacement product module.
+Bounded task completed: Added shared path/connection/read-only/migration helpers and immutable schema ownership; converted conversation/jobs/phone stores, main startup, dashboard reads and conversation clearing. Created a clean unified local DB with no import.
+Files added: butler/storage.py, butler/storage_schema.py, tests/test_unified_storage.py, docs/DATABASE.md. Ignored runtime file db/butler.sqlite3 initialized.
+Files modified: butler/main.py, memory/store.py, jobs.py, phone/store.py and provider.py, launcher maintenance/GUI, debug dashboard server/insights, settings.env, AGENTS.md, README.md; affected memory/dashboard/phone/launcher test fixtures; Devices design storage note; awareness-memory status/decisions/questions/session log. Prior retirement/design changes preserved.
+Migrations added: Initial atomic version 1, initial_conversation_jobs_phone (eight implemented-domain tables plus storage ledger); no Devices/World Context/future-memory schemas.
+Decisions made: ADR-060; owner waived old-data import; retain domain ownership while sharing the file and migration policy.
+Assumptions confirmed or changed: SQLite has no server to launch. Butler initializes/migrates before workers; old per-domain environment settings no longer select independent files. Both memory-clear operations preserve jobs/calls and migration history.
+Tests run: Exact 14 discovery patterns and final counts in docs/DATABASE.md, using .venv-runtime; 12 new storage cases include real file concurrency, lock timeout/recovery, migration rollback/rejection, read-only isolation, startup-failure ordering and clearing. Existing effects mocked/local; no live inference/actuation.
+Tests passed: 170 final cases, zero failures/skips; Python compilation, document-link/whitespace checks and clean runtime integrity/bootstrap checks passed. Old database size/mtime metadata unchanged.
+Tests failed: Initial new suite had a WAL first-open lock race and two Windows fixture-cleanup errors from unclosed SQLite connections. Bounded journal retry and explicit connection closure fixed them; final suite passed. A later phone rerun caught an unnecessary constructor-field removal; compatibility was restored and all 19 phone tests passed again. No tests weakened.
+Commands not run: Full suite, unrelated known personality test, live LLM/voice/GUI/phone/device acceptance, old-data import, process restart/deployment, OS startup registration or database deletion.
+Known limitations: SQLite serializes writers; future heavy telemetry needs measurement. Ownership is a code convention, not SQLite roles. Existing running processes need restart. Existing audioop deprecation warning remains. Missing-table/history checks do not constitute general corruption recovery or automatic backups.
+Security implications: Centralized path/policies; non-creating read-only dashboard connections; memory clear no longer deletes a shared file; provider/network effects mocked. No new tool/external service, credential movement, or physical action.
+Deployment implications: Restart Butler and MCP/dashboard processes to adopt new path/schema. New empty db/butler.sqlite3 is ready. Old three SQLite files, archived Postgres data and firmware unchanged. No Docker needed for active storage.
+Unresolved questions: Product-module schemas and future backup/retention policy remain separately scoped; no dependency blocks this cutover.
+Current repository state: Uncommitted implementation plus prior retirement/design work preserved. No submodule edits or destructive filesystem operations.
+Next permitted task: Separately assigned bounded task; do not begin Devices automatically.
+Required reading for next session: docs/DATABASE.md, ADR-060, root AGENTS.md; Devices design if implementing that module; tool guide for agent-facing changes.
+Explicit stop point: Unified storage complete and verified. No future product systems, tables, import pipeline or boot-service installation started.
+
+
+## 2026-11-18 - Launcher awareness-artifact follow-up
+
+Session goal: Inspect and remove remaining retired-awareness artifacts in the launcher.
+Current phase: Bounded retirement follow-up; no replacement implementation.
+Bounded task completed: Removed the Awareness/MQTT panel and obsolete broker variables/load/save wiring, awareness situation checkbox/prompt flag, fallback API/MQTT defaults and stale package description. Removed four obsolete settings previously reintroduced by launcher saves. Clarified active conversation memory/history/saved-fact controls and clearing labels.
+Files added: None.
+Files modified: butler/launcher/gui.py, config.py, __init__.py; settings.env; tests/test_launcher_llm_debug.py; docs/awareness-memory/IMPLEMENTATION_STATUS.md and SESSION_LOG.md.
+Migrations added: None.
+Decisions made: No new architectural decision. Applied ADR-058 retirement while retaining ADR-060 conversation-owned facts/history.
+Assumptions confirmed or changed: The prior cleanup missed launcher controls that still rewrote retired settings. Remembered facts are active conversation SQLite functionality, not the retired PostgreSQL awareness memory.
+Tests run: .venv-runtime/Scripts/python.exe -m unittest discover -s tests -p test_launcher*.py -q; py_compile on launcher GUI/config and changed test; targeted artifact searches and Git diff whitespace check.
+Tests passed: 29 launcher cases; compilation, no-retired-key search and whitespace checks passed. New headless widget/persistence regression constructs the full layout, loads and saves settings, checks obsolete controls absent and verifies the active memory setting still toggles.
+Tests failed: Initial new test referenced the wrong fallback-default constant name; corrected it and all 29 passed. No production failure or test weakening.
+Commands not run: Live Tk GUI/screenshot acceptance, full suite, model/device calls, process restart/deployment.
+Known limitations: Already-open launchers retain old code and must be closed/reopened; an old GUI can still rewrite obsolete keys until restarted. Headless widget tests do not establish visual layout acceptance.
+Security implications: No secrets, data deletion or device operations; memory behavior unchanged.
+Deployment implications: Reopen launcher to apply control removal; no database migration.
+Unresolved questions: None for this cleanup.
+Current repository state: Prior retirement/storage/design changes preserved; no unrelated runtime changes.
+Next permitted task: Separately assigned bounded work; do not begin Devices automatically.
+Required reading for next session: Current status, ADR-058/060, docs/DATABASE.md.
+Explicit stop point: Launcher artifacts removed and active conversation-memory labeling clarified.

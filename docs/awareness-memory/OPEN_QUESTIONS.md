@@ -154,3 +154,28 @@ No direct contradiction was found in the source. One wording tension is delibera
 ## Snapshot coverage follow-up (2026-11-18)
 
 The observed snapshot investigation in [PER_TURN_AWARENESS_2026-11-18.md](PER_TURN_AWARENESS_2026-11-18.md) leaves two repository/deployment questions: why the local Docker Desktop Linux engine/database is unavailable, and what representative device/property coverage should be guaranteed within the automatic snapshot budget. Current selection prioritizes historical announcements over device facts and has no per-turn entity targeting. No policy decision or runtime repair was made in this investigation.
+
+## Retirement disposition (2026-11-18)
+
+The owner chose archival instead of further repair (ADR-058). Earlier database availability and snapshot coverage questions now describe the retired implementation; do not repair or reactivate it implicitly. Replacement-system requirements and the unrelated default-personality test mismatch are documented in RETIREMENT_2026-11-18.md and await separately bounded work.
+
+
+## Devices design/discovery items (2026-11-18)
+
+See [Devices design](../DEVICES_SYSTEM_DESIGN.md). Before the relevant bounded
+implementation, verify the kitchen screen's actual integration and observable
+fields, choose adapter polling/expiry intervals, finalize minimal local storage
+and evidence retention, design the main-process-to-MCP read bridge, and measure
+summary size/coverage and existing permission/provider disclosure behavior.
+These are explicit design/discovery items, not blockers requiring a new service
+or authorization to scaffold future systems. No runtime implementation started.
+
+
+## Shared-storage resolution (2026-11-18)
+
+ADR-060 resolves the database-file/connection/migration ownership question:
+active domains share one application SQLite database. Old data import was waived;
+no data reconciliation project is pending. Future Devices schema and diagnostic
+retention remain part of its separately assigned implementation; the kitchen
+screen contract, adapter refresh/expiry and per-turn coverage questions remain.
+See ../DATABASE.md. This change does not configure Butler to launch at OS boot.

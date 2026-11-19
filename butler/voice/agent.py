@@ -22,7 +22,6 @@ import numpy as np
 import speech_recognition as sr
 
 from butler.config import env_bool, env_float, env_int, load_environment, require_env
-from butler.services import awareness_signals
 from butler.telemetry import emit_pipeline_event
 from butler.text.service_client import (
     send_interrupt,
@@ -862,9 +861,6 @@ def _report_then_redispatch(
         return
     benchmark = VoiceBenchmarkSession(wake_word=WAKE_WORD, wake_word_mode=WAKE_WORD_MODE)
     benchmark.mark_wake_word_detected()
-    awareness_signals.record_presence(
-        modality="wake_word", confidence=0.95, detail="barge_in", force=True
-    )
     benchmark.set_transcript(transcript.lower())
     benchmark.set_command(command)
     benchmark.set_dimension("barge_in", True)
@@ -1271,14 +1267,6 @@ def _process_recognition_audio(audio_data):
             # cue is not queued behind the dispatch it is meant to announce.
             _signal_wake_cue()
             benchmark.mark_wake_word_detected()
-            # A wake word is a timestamped observation that a person is in the
-            # room, from a source of known reliability -- structurally the same
-            # kind of fact as a pin status, and previously discarded. force=True
-            # because a deliberate wake is always worth recording, even inside
-            # the presence rate-limit window.
-            awareness_signals.record_presence(
-                modality="wake_word", confidence=0.95, force=True
-            )
             command = _WAKE_WORD_PREFIX.sub("", text_spoken, count=1).strip()
             print(f"Command received: {command}")
             if command:
@@ -1324,7 +1312,7 @@ def speak_text(text: str) -> None:
     """Vocalize already-composed text through the same Polly + audio-output path
     used for spoken replies, WITHOUT invoking the LLM.
 
-    Proactive speech (reminders, awareness alerts, scheduled reports) is phrased
+    Unsolicited speech (external announcements and scheduled reports) is phrased
     upstream in the main-agent router and handed here only to be heard, so the
     system can speak without the user prompting it. Serialized on a lock so two
     utterances never fight over the output device, and interruptible on the same

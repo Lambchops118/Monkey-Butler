@@ -9,15 +9,15 @@ it is on:
 - the physical display the panel is shown on is put into standby, and lit again
   on wake (:mod:`butler.services.display_power`). Sleep mode and a dark screen
   are one action: neither can be asked for without the other;
-- unsolicited speech (awareness alerts, briefings, scheduled announcements) is
+- unsolicited speech (alerts and scheduled announcements) is
   held back unless it is tagged ``critical``;
 - nothing else. A command the user actually speaks is still answered out loud,
   because a butler that ignores you is indistinguishable from a crashed one.
 
 The flag lives in a small JSON file instead of a module global because its
 readers sit in different processes: the GUI, router and text server share the
-main process, the MCP tool server is a subprocess of the agent runtime, and the
-awareness backend is its own container. Reads come from a cache that re-stats
+main process, and the MCP tool server is a subprocess of the agent runtime.
+Reads come from a cache that re-stats
 the file at most every ``CACHE_TTL_SECONDS``, which keeps the 60 fps render
 loop off the filesystem; writes are atomic (temp file + replace) so a reader
 never sees a half-written file.
@@ -64,8 +64,8 @@ DIM_LEVEL = min(max(env_float("BUTLER_SLEEP_DIM_LEVEL", 0.01), 0.0), 1.0)
 # two stat() calls a second.
 CACHE_TTL_SECONDS = 0.5
 
-# Severities that still speak while asleep. The awareness backend tags its own
-# notifications; anything untagged is treated as routine.
+# Severities that still speak while asleep. Notification producers tag their own
+# messages; anything untagged is treated as routine.
 CRITICAL_SEVERITIES = frozenset({"critical"})
 
 # Notes handed to the model instead of a canned reply. The state change is
@@ -126,8 +126,8 @@ _SLEEP_TOPIC = re.compile(
 )
 
 # Titles of system announcements that end sleep mode by themselves. The morning
-# briefing is the wake-up message; matching on its title keeps the awareness
-# backend unaware of sleep mode entirely.
+# briefing is the wake-up message; matching on its title keeps the producer
+# independent of sleep mode.
 _WAKE_ANNOUNCEMENT_TITLES = (
     "morning briefing",
     "morning report",
@@ -268,7 +268,7 @@ def should_speak(severity: str = "") -> bool:
 def is_wake_announcement(title: str) -> bool:
     """Whether this system announcement is the morning wake-up message.
 
-    The morning briefing arrives from the awareness backend titled
+    An external producer may send a message titled
     "Morning briefing"; delivering it is the moment the house is expected to be
     awake again, so it clears sleep mode before it is spoken.
     """

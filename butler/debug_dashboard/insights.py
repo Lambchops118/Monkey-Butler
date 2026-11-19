@@ -9,6 +9,8 @@ sizes) leaves this module, never message text.
 
 from __future__ import annotations
 
+from butler.storage import connect_readonly
+
 import json
 import os
 import sqlite3
@@ -336,17 +338,17 @@ def read_memory_store_stats(memory_db: Path) -> dict[str, Any]:
     except OSError:
         created = None
     try:
-        connection = sqlite3.connect(f"file:{memory_db.as_posix()}?mode=ro", uri=True, timeout=0.5)
+        connection = connect_readonly(memory_db)
         try:
             counts = {
-                table: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+                table: connection.execute(f"SELECT count(*) FROM conversation_{table}").fetchone()[0]
                 for table in ("sessions", "messages", "facts", "summaries")
             }
             facts_by_scope = dict(
-                connection.execute("SELECT scope, count(*) FROM facts GROUP BY scope").fetchall()
+                connection.execute("SELECT scope, count(*) FROM conversation_facts GROUP BY scope").fetchall()
             )
-            newest_fact = connection.execute("SELECT max(updated_at) FROM facts").fetchone()[0]
-            oldest_message = connection.execute("SELECT min(created_at) FROM messages").fetchone()[0]
+            newest_fact = connection.execute("SELECT max(updated_at) FROM conversation_facts").fetchone()[0]
+            oldest_message = connection.execute("SELECT min(created_at) FROM conversation_messages").fetchone()[0]
         finally:
             connection.close()
     except sqlite3.Error as exc:

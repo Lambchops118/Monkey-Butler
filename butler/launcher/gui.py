@@ -104,15 +104,11 @@ class LauncherGUI:
         comp = ttk.LabelFrame(left, text="Components to start", padding=8)
         comp.pack(fill="x")
         self.var_ollama = tk.BooleanVar()
-        self.var_awareness_db = tk.BooleanVar()
-        self.var_awareness = tk.BooleanVar()
         self.var_main = tk.BooleanVar()
         self.var_voice = tk.BooleanVar()
         self.var_display = tk.BooleanVar()
         self.var_discord = tk.BooleanVar()
         ttk.Checkbutton(comp, text="Ollama (LLM server)", variable=self.var_ollama).pack(anchor="w")
-        ttk.Checkbutton(comp, text="Awareness DB (Docker Postgres)", variable=self.var_awareness_db).pack(anchor="w")
-        ttk.Checkbutton(comp, text="Awareness backend", variable=self.var_awareness).pack(anchor="w")
         ttk.Checkbutton(comp, text="Main agent", variable=self.var_main).pack(anchor="w")
         ttk.Checkbutton(comp, text="Voice worker", variable=self.var_voice).pack(anchor="w")
         ttk.Checkbutton(comp, text="InfoPanel display", variable=self.var_display).pack(anchor="w")
@@ -122,11 +118,7 @@ class LauncherGUI:
         opts = ttk.LabelFrame(left, text="Options", padding=8)
         opts.pack(fill="x", pady=(8, 0))
         self.var_manage_ollama = tk.BooleanVar()
-        self.var_manage_docker = tk.BooleanVar()
-        self.var_run_migrations = tk.BooleanVar()
         ttk.Checkbutton(opts, text="Start Ollama if not already running", variable=self.var_manage_ollama).pack(anchor="w")
-        ttk.Checkbutton(opts, text="Manage Docker Postgres (compose up)", variable=self.var_manage_docker).pack(anchor="w")
-        ttk.Checkbutton(opts, text="Run DB migrations before serving", variable=self.var_run_migrations).pack(anchor="w")
 
         # --- Room microphone ---------------------------------------------
         microphone = ttk.LabelFrame(left, text="Voice Input", padding=8)
@@ -210,19 +202,6 @@ class LauncherGUI:
 
         llm.columnconfigure(1, weight=1)
 
-        # --- Awareness / MQTT --------------------------------------------
-        mqtt = ttk.LabelFrame(left, text="Awareness / MQTT", padding=8)
-        mqtt.pack(fill="x", pady=(8, 0))
-        self.var_mqtt = tk.BooleanVar()
-        ttk.Checkbutton(mqtt, text="MQTT enabled", variable=self.var_mqtt).grid(row=0, column=0, columnspan=2, sticky="w")
-        ttk.Label(mqtt, text="Broker host:").grid(row=1, column=0, sticky="w")
-        self.var_mqtt_host = tk.StringVar()
-        ttk.Entry(mqtt, textvariable=self.var_mqtt_host, width=20).grid(row=1, column=1, sticky="we", padx=4, pady=2)
-        ttk.Label(mqtt, text="Broker port:").grid(row=2, column=0, sticky="w")
-        self.var_mqtt_port = tk.StringVar()
-        ttk.Entry(mqtt, textvariable=self.var_mqtt_port, width=20).grid(row=2, column=1, sticky="we", padx=4, pady=2)
-        mqtt.columnconfigure(1, weight=1)
-
         # --- GPU assignment ----------------------------------------------
         gpu = ttk.LabelFrame(left, text="GPU assignment", padding=8)
         gpu.pack(fill="x", pady=(8, 0))
@@ -248,7 +227,7 @@ class LauncherGUI:
         self.btn_start.pack(side="left", padx=6)
         self.btn_stop = ttk.Button(buttons, text="Stop", command=self._on_stop, state="disabled")
         self.btn_stop.pack(side="left")
-        self.btn_clear = ttk.Button(buttons, text="Clear memory…", command=self._on_clear_memory)
+        self.btn_clear = ttk.Button(buttons, text="Clear conversation memory…", command=self._on_clear_memory)
         self.btn_clear.pack(side="left", padx=6)
         self.btn_clear_chat = ttk.Button(
             buttons, text="Clear chat history…", command=self._on_clear_chat_history
@@ -323,7 +302,7 @@ class LauncherGUI:
         """Everything that ends up in front of the model, in one place.
 
         Each box here changes what the main agent sends per turn — tool schemas,
-        remembered facts, the injected clock, the awareness snapshot — rather than
+        conversation memory and the injected clock — rather than
         which processes run. All of them persist to ``settings.env`` (the agent
         reads them at startup), unlike the component checkboxes on the left.
         """
@@ -397,21 +376,15 @@ class LauncherGUI:
             self._tool_dependent.append(button)
 
         # -- non-tool context injected every turn ----------------------------
-        injected = ttk.LabelFrame(outer, text="Injected context", padding=6)
+        injected = ttk.LabelFrame(outer, text="Conversation context", padding=6)
         injected.pack(fill="x", pady=(8, 0))
         self.var_memory = tk.BooleanVar(value=True)
         self.var_inject_time = tk.BooleanVar(value=True)
-        self.var_situation = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            injected, text="Remembered facts (memory block)", variable=self.var_memory
+            injected, text="Conversation memory (history + saved facts)", variable=self.var_memory
         ).pack(anchor="w")
         ttk.Checkbutton(
             injected, text="Current date & time", variable=self.var_inject_time
-        ).pack(anchor="w")
-        ttk.Checkbutton(
-            injected,
-            text="Awareness situation snapshot",
-            variable=self.var_situation,
         ).pack(anchor="w")
 
         # -- speaker volume ---------------------------------------------------
@@ -434,7 +407,6 @@ class LauncherGUI:
             (self.var_reduce_kicad, "BUTLER_REDUCE_KICAD_TOOL_SURFACE", True, False),
             (self.var_memory, "BUTLER_MEMORY_ENABLED", True, False),
             (self.var_inject_time, "BUTLER_INJECT_CURRENT_TIME", True, False),
-            (self.var_situation, "BUTLER_AWARENESS_SITUATION_ENABLED", True, False),
         ]
 
     def _on_toggle_tools(self) -> None:
@@ -497,8 +469,6 @@ class LauncherGUI:
 
     def _load_into_widgets(self) -> None:
         self.var_ollama.set(self.cfg.start_ollama)
-        self.var_awareness_db.set(self.cfg.start_awareness_db)
-        self.var_awareness.set(self.cfg.start_awareness)
         self.var_main.set(self.cfg.start_main)
         self.var_voice.set(self.cfg.start_voice)
         self.var_display.set(self.cfg.start_display)
@@ -513,8 +483,6 @@ class LauncherGUI:
         )
         self.var_discord.set(self.cfg.start_discord)
         self.var_manage_ollama.set(self.cfg.manage_ollama)
-        self.var_manage_docker.set(self.cfg.manage_docker)
-        self.var_run_migrations.set(self.cfg.run_migrations)
         disabled_servers = {key.lower() for key in self.cfg.disabled_mcp_servers}
         disabled_providers = {key.lower() for key in self.cfg.disabled_mcp_providers}
         for entry in self.mcp_entries:
@@ -528,9 +496,6 @@ class LauncherGUI:
         self.var_use_api.set(self.cfg.use_api_models)
         self.var_api_model.set(self.cfg.api_llm_model)
         self.var_think.set(self._think_label_for(config.get_setting("BUTLER_LLM_THINK_MODE")))
-        self.var_mqtt.set(config.setting_bool("BUTLER_AWARENESS_MQTT_ENABLED", True))
-        self.var_mqtt_host.set(config.get_setting("BUTLER_AWARENESS_MQTT_HOST"))
-        self.var_mqtt_port.set(config.get_setting("BUTLER_AWARENESS_MQTT_PORT"))
         for var, key, default, invert in self._prompt_context_settings():
             value = config.setting_bool(key, default)
             var.set(not value if invert else value)
@@ -540,8 +505,6 @@ class LauncherGUI:
 
     def _collect_config(self) -> LauncherConfig:
         self.cfg.start_ollama = self.var_ollama.get()
-        self.cfg.start_awareness_db = self.var_awareness_db.get()
-        self.cfg.start_awareness = self.var_awareness.get()
         self.cfg.start_main = self.var_main.get()
         self.cfg.start_voice = self.var_voice.get()
         self.cfg.start_display = self.var_display.get()
@@ -555,8 +518,6 @@ class LauncherGUI:
         self.cfg.speaker_volume = config.clamp_volume(self.var_volume.get())
         self.cfg.start_discord = self.var_discord.get()
         self.cfg.manage_ollama = self.var_manage_ollama.get()
-        self.cfg.manage_docker = self.var_manage_docker.get()
-        self.cfg.run_migrations = self.var_run_migrations.get()
         self.cfg.llm_gpu_index = self._gpu_index_from(self.var_llm_gpu.get())
         self.cfg.stt_gpu_index = self._gpu_index_from(self.var_stt_gpu.get())
         self.cfg.use_api_models = self.var_use_api.get()
@@ -591,9 +552,6 @@ class LauncherGUI:
         config.set_setting("BUTLER_LLM_MODEL", self.var_model.get().strip())
         config.set_setting("BUTLER_LLM_BASE_URL", self.var_base_url.get().strip())
         config.set_setting("BUTLER_LLM_THINK_MODE", self._think_value_from(self.var_think.get()))
-        config.set_setting("BUTLER_AWARENESS_MQTT_ENABLED", "1" if self.var_mqtt.get() else "0")
-        config.set_setting("BUTLER_AWARENESS_MQTT_HOST", self.var_mqtt_host.get().strip())
-        config.set_setting("BUTLER_AWARENESS_MQTT_PORT", self.var_mqtt_port.get().strip())
         for var, key, _default, invert in self._prompt_context_settings():
             checked = var.get()
             config.set_setting(key, "1" if (not checked if invert else checked) else "0")
@@ -660,11 +618,10 @@ class LauncherGUI:
             )
             return
         if not messagebox.askyesno(
-            "Clear all memory",
+            "Clear conversation memory",
             "This PERMANENTLY deletes:\n\n"
-            "  • the awareness system's long-term memory\n"
             "  • the persistent conversation store (facts, summaries, history)\n\n"
-            "Presence, state, history, and alerts are NOT affected. This cannot "
+            "Jobs, phone records and other application data are not affected. This cannot "
             "be undone. Proceed?",
             icon="warning",
             default="no",
@@ -678,10 +635,7 @@ class LauncherGUI:
         from . import maintenance
 
         try:
-            summary = maintenance.clear_all_memory(
-                log=self._enqueue_log,
-                ensure_db=self.var_manage_docker.get(),
-            )
+            summary = maintenance.clear_all_memory(log=self._enqueue_log)
             self.root.after(0, lambda: self._on_clear_done(summary, None))
         except Exception as exc:  # noqa: BLE001 - surface any failure to the user
             self.root.after(0, lambda: self._on_clear_done(None, exc))
@@ -697,8 +651,8 @@ class LauncherGUI:
             self._append_log("clear", summary or "done")
 
     def _on_clear_chat_history(self) -> None:
-        # Unlike "Clear memory…", this only removes conversation turns (not
-        # facts, not awareness) and does so through a second SQLite connection
+        # Unlike "Clear conversation memory…", this only removes conversation turns (not
+        # facts) and does so through a second SQLite connection
         # rather than deleting the file, so it works whether Butler is running
         # or stopped -- the fix for a session stuck imitating a bad pattern in
         # its own recent replies, without losing anything durable.
@@ -706,8 +660,7 @@ class LauncherGUI:
             "Clear chat history",
             "This PERMANENTLY deletes every session's conversation turns "
             "(what was said back and forth, this turn's tool-history included).\n\n"
-            "Remembered facts, the awareness system, presence, state, history, "
-            "and alerts are NOT affected. This cannot be undone. Proceed?",
+            "Saved conversation facts are NOT affected. This cannot be undone. Proceed?",
             icon="warning",
             default="no",
         ):

@@ -104,9 +104,7 @@ INJECT_CURRENT_TIME = env_bool("BUTLER_INJECT_CURRENT_TIME", True)
 # Counter the strongest in-context pattern the assistant ever sees: its own
 # transcript. See :func:`_history_grounding_notice`.
 INJECT_HISTORY_GROUNDING = env_bool("BUTLER_INJECT_HISTORY_GROUNDING", True)
-# Backstop only. The awareness broker's own token budget decides what the
-# snapshot contains; this just refuses an unbounded string. See
-# :func:`_format_context` for what happened when it was set below that budget.
+# Bound caller-supplied status context independently of conversation history.
 CONTEXT_SNAPSHOT_CHAR_LIMIT = env_int("BUTLER_CONTEXT_SNAPSHOT_CHAR_LIMIT", 4000)
 # Local models sometimes print a tool call as plain text instead of returning a
 # structured tool call (the hosted Responses API could not). Recover it: parse
@@ -710,26 +708,6 @@ def _emit_tool_call_telemetry(
         shaped_output_bytes=len(shaped_output.encode("utf-8", "replace")),
         failed=failed,
     )
-    # The JSONL telemetry above is for humans reading logs after the fact.
-    # A *failed* tool call is also a fact about the world the system should be
-    # able to recall and raise later ("the watering you asked for did not go
-    # through"), so failures — and only failures, to keep the event store
-    # signal-dense — are additionally recorded in awareness. Result text is
-    # never sent, only its shape.
-    if failed:
-        from butler.services import awareness_signals
-
-        awareness_signals.record_agent_event(
-            "agent.tool.failed",
-            {
-                "tool_name": name,
-                "transport": "host" if name in HOST_TOOL_NAMES else "mcp",
-                "round": round_number,
-                "tool_ms": round(tool_ms, 1),
-                "request_id": request_id,
-            },
-            severity="warning",
-        )
 
 
 def _normalize_interaction_mode(mode: str | None) -> str:
@@ -994,24 +972,7 @@ def _record_memory_turn(
 
 
 def _format_context(snapshot: str) -> str | None:
-    """Render the awareness situation snapshot for the turn.
-
-    The length limit here is a backstop, not the budget. The awareness broker
-    already ranks candidates and fits them to ``situation_budget_tokens`` (600
-    by default, about 2.4k characters), and it guarantees that every critical
-    alert survives its own selection. A 500-character cut applied afterwards
-    silently undid both: it discarded roughly three quarters of a full snapshot
-    -- measured at 1559 of 2059 characters on the deployed box -- and what it
-    kept was whatever sorted first, in practice a few verbose announcement
-    receipts. Every STATE, health and transition line, which is to say every
-    fact about the actual house, fell off the end, and a critical alert the
-    broker had deliberately protected could go with it.
-
-    That is why "is the plant watering system online?" reached the model with no
-    device state in context at all. Keep this comfortably above the broker's
-    budget so the component that reasons about priority is the one that decides
-    what survives.
-    """
+    """Render the supplied bounded legacy status context."""
     if not snapshot or snapshot == "no recent status":
         return None
     snapshot = " ".join(str(snapshot).split())
@@ -1796,39 +1757,11 @@ def _invoke_host_tool(
             salience=salience,
             source_session_id=session_id,
         )
-        # Phase 6: mirror the explicit user fact into the awareness
-        # subsystem's validated long-term memory (supersession-aware,
-        # provenance-backed). The SQLite store above stays authoritative for
-        # prompt assembly; failures here are reported, not hidden.
-        awareness_synced = False
-        try:
-            from butler.services import awareness_client
-
-            awareness_client.post_json(
-                "/memory/deterministic",
-                {
-                    "statement": f"{key}: {value}",
-                    "scope": scope,
-                    "structured_content": {"key": key, "value": value},
-                    "evidence": [
-                        {
-                            "kind": "user_confirmation",
-                            "reference": f"session:{session_id}",
-                            "metadata": {"tool": "remember_memory_fact"},
-                        }
-                    ],
-                    "importance": min(1.0, max(0.0, salience / 10.0)),
-                },
-            )
-            awareness_synced = True
-        except Exception:
-            awareness_synced = False
         return json.dumps(
             {
                 "success": True,
                 "scope": scope,
                 "key": key,
-                "awareness_memory_synced": awareness_synced,
                 "message": "Memory fact stored.",
             }
         )

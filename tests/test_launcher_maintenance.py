@@ -48,8 +48,8 @@ class ClearChatHistoryTests(unittest.TestCase):
         self.assertIn("in-memory", summary)
 
     def test_does_not_require_butler_to_be_stopped(self) -> None:
-        # Unlike clear_conversation_memory, this deletes rows through a second
-        # connection rather than unlinking the file, so a second, still-open
+        # Both clear operations delete domain-owned rows through a second
+        # connection rather than unlinking the shared file, so a still-open
         # MemoryStore connection to the same path must not block it.
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "memory.sqlite3"

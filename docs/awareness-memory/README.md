@@ -1,3 +1,6 @@
+> **Archived 2026-11-18:** This is historical design documentation. The subsystem
+> is retired; see the [retirement report](RETIREMENT_2026-11-18.md).
+
 # Awareness and Memory Implementation Guide
 
 This documentation divides the robust distributed presence, awareness, event-processing, state, history, alerting, and memory subsystem into bounded implementation sessions. It is designed for coding agents that must preserve the architecture without loading a 2,800-line prompt on every turn.

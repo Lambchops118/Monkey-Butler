@@ -99,14 +99,13 @@ class NotifyEndpointTest(unittest.TestCase):
             with patch.object(router, "JobManager") as jobs, \
                  patch.object(router, "_classify_with_context") as classify, \
                  patch.object(router, "_run_agent_command") as agent, \
-                 patch.object(router, "_speak_via_voice_worker") as speak, \
-                 patch.object(router, "awareness_signals") as signals:
+                 patch.object(router, "_speak_via_voice_worker") as speak:
                 router.router_loop(running.central_queue, gui)
             speak.assert_called_once_with(text)
             classify.assert_not_called()
             agent.assert_not_called()
             jobs.return_value.submit.assert_not_called()
-            self.assertEqual(signals.mock_calls, [])
+            self.assertFalse(hasattr(router, "awareness_signals"))
             self.assertEqual(gui.get_nowait(), ("VOICE_CMD", "[NOTICE] Arrival briefing", text))
         finally:
             running.close()

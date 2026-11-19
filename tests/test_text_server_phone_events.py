@@ -92,7 +92,7 @@ class PhoneEventsEndpointTests(unittest.TestCase):
             os.environ,
             {
                 "BUTLER_PHONE_PROVIDER": "elevenlabs_twilio",
-                "BUTLER_PHONE_DB_PATH": str(Path(self._tmpdir.name) / "phone.sqlite3"),
+                "BUTLER_DB_PATH": str(Path(self._tmpdir.name) / "phone.sqlite3"),
             },
             clear=False,
         )

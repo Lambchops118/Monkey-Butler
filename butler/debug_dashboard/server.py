@@ -31,6 +31,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from butler.config import load_environment
+from butler.storage import DEFAULT_DB_PATH, connect_readonly, database_path
 from butler.debug_dashboard.insights import (
     read_llm_round_stats,
     read_memory_store_stats,
@@ -43,8 +44,8 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 STATIC_ROOT = PACKAGE_ROOT / "static"
 REPO_ROOT = PACKAGE_ROOT.parents[1]
 DEFAULT_LOG_ROOT = REPO_ROOT / "butler" / "logs"
-DEFAULT_MEMORY_DB = REPO_ROOT / "db" / "talos_memory.sqlite3"
-DEFAULT_JOB_DB = REPO_ROOT / "db" / "talos_jobs.sqlite3"
+DEFAULT_MEMORY_DB = DEFAULT_DB_PATH
+DEFAULT_JOB_DB = DEFAULT_DB_PATH
 
 MAX_TELEMETRY_EVENTS = 500
 MAX_BENCHMARK_ROWS = 200
@@ -216,19 +217,18 @@ def read_conversation_messages(memory_db: Path, *, limit: int) -> dict[str, Any]
     if not memory_db.exists():
         return {
             "status": "not_available",
-            "source": "db/talos_memory.sqlite3",
+            "source": str(memory_db),
             "messages": [],
             "reason": "Conversation database does not exist.",
         }
-    uri = f"file:{memory_db.as_posix()}?mode=ro"
     try:
-        connection = sqlite3.connect(uri, uri=True, timeout=0.5)
+        connection = connect_readonly(memory_db)
         connection.row_factory = sqlite3.Row
         try:
             rows = connection.execute(
                 """
                 SELECT id, session_id, role, content, created_at, metadata_json
-                FROM messages
+                FROM conversation_messages
                 WHERE role IN ('user', 'assistant')
                 ORDER BY id DESC
                 LIMIT ?
@@ -240,7 +240,7 @@ def read_conversation_messages(memory_db: Path, *, limit: int) -> dict[str, Any]
     except sqlite3.Error as exc:
         return {
             "status": "degraded",
-            "source": "db/talos_memory.sqlite3",
+            "source": str(memory_db),
             "messages": [],
             "reason": str(exc)[:300],
         }
@@ -263,7 +263,7 @@ def read_conversation_messages(memory_db: Path, *, limit: int) -> dict[str, Any]
         )
     return {
         "status": "available",
-        "source": "db/talos_memory.sqlite3 (read-only)",
+        "source": f"{memory_db} (read-only)",
         "messages": messages,
         "newest_timestamp": messages[0]["created_at"] if messages else None,
     }
@@ -274,9 +274,8 @@ def read_jobs(job_db: Path, *, limit: int) -> dict[str, Any]:
     limit = _bounded_int(limit, 50, minimum=1, maximum=MAX_JOB_ROWS)
     if not job_db.exists():
         return {"status": "not_available", "source": str(job_db), "jobs": []}
-    uri = f"file:{job_db.as_posix()}?mode=ro"
     try:
-        connection = sqlite3.connect(uri, uri=True, timeout=0.5)
+        connection = connect_readonly(job_db)
         connection.row_factory = sqlite3.Row
         try:
             rows = connection.execute(
@@ -322,7 +321,7 @@ def read_jobs(job_db: Path, *, limit: int) -> dict[str, Any]:
 _DURATION_FIELDS = (
     "text_stream_total_ms", "agent_stream_total_ms", "llm_request_ms",
     "tool_execution_ms", "tool_ms", "prompt_assembly_ms",
-    "awareness_snapshot_ms", "barge_in_decision_ms", "duration_ms",
+    "state_snapshot_ms", "barge_in_decision_ms", "duration_ms",
 )
 
 
@@ -785,15 +784,15 @@ class DebugSnapshotService:
         self,
         *,
         log_root: Path = DEFAULT_LOG_ROOT,
-        memory_db: Path = DEFAULT_MEMORY_DB,
-        job_db: Path = DEFAULT_JOB_DB,
+        memory_db: Path | None = None,
+        job_db: Path | None = None,
         sampler: SystemSampler | None = None,
         system_metrics_url: str | None = None,
     ) -> None:
         load_environment()
         self.log_root = Path(log_root)
-        self.memory_db = Path(memory_db)
-        self.job_db = Path(job_db)
+        self.memory_db = Path(memory_db) if memory_db is not None else database_path()
+        self.job_db = Path(job_db) if job_db is not None else database_path()
         self.sampler = sampler
         self._host_history: deque[dict[str, Any]] = deque(maxlen=3600)
         self._cache: dict[str, tuple[float, Any]] = {}
@@ -807,10 +806,6 @@ class DebugSnapshotService:
             else os.getenv("BUTLER_DEBUG_SYSTEM_METRICS_URL", "")
         ).strip()
         self.system_metrics_token = os.getenv("BUTLER_DEBUG_SYSTEM_METRICS_TOKEN", "").strip()
-        self.awareness_url = os.getenv(
-            "BUTLER_AWARENESS_API_URL", "http://127.0.0.1:8600"
-        ).rstrip("/")
-        self.awareness_token = os.getenv("BUTLER_AWARENESS_API_TOKEN", "").strip()
         self.main_url = os.getenv(
             "BUTLER_TEXT_AGENT_URL", "http://127.0.0.1:8420"
         ).rstrip("/")
@@ -847,23 +842,6 @@ class DebugSnapshotService:
         self._record_host_history(host)
         services = list(self._cached("services", 2.0, self._service_health))
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            metrics_future = executor.submit(
-                self._cached,
-                "awareness_metrics",
-                3.0,
-                lambda: read_json_endpoint(
-                    f"{self.awareness_url}/metrics", token=self.awareness_token
-                ),
-            )
-            actions_future = executor.submit(
-                self._cached,
-                f"awareness_actions:{interaction_limit}",
-                5.0,
-                lambda: read_json_endpoint(
-                    f"{self.awareness_url}/actions?limit={min(200, interaction_limit)}",
-                    token=self.awareness_token,
-                ),
-            )
             main_future = executor.submit(
                 self._cached,
                 "main_runtime",
@@ -878,8 +856,8 @@ class DebugSnapshotService:
                 3.0,
                 lambda: read_ollama_placement(self.ollama_url),
             )
-            awareness_metrics = metrics_future.result()
-            awareness_actions = actions_future.result()
+            awareness_metrics = {"status": "archived", "reason": "Awareness was retired", "data": {}}
+            awareness_actions = {"status": "archived", "reason": "Action backend was retired", "data": {}}
             main_runtime = main_future.result()
             ollama_placement = ollama_future.result()
         # Wider scans than the live window; refreshed less often.
@@ -1051,15 +1029,11 @@ class DebugSnapshotService:
 
     def _service_health(self) -> list[dict[str, Any]]:
         text_url = os.getenv("BUTLER_TEXT_AGENT_URL", "http://127.0.0.1:8420").rstrip("/")
-        awareness_url = os.getenv(
-            "BUTLER_AWARENESS_API_URL", "http://127.0.0.1:8600"
-        ).rstrip("/")
         voice_port = _bounded_int(
             os.getenv("BUTLER_VOICE_SPEAK_PORT", "8610"), 8610, minimum=1, maximum=65535
         )
         probes = (
             (_http_probe, ("main text agent", f"{text_url}/health")),
-            (_http_probe, ("awareness API", f"{awareness_url}/health/components")),
             (_http_probe, ("Ollama", "http://127.0.0.1:11434/api/version")),
             (_tcp_probe, ("voice worker speak API", "127.0.0.1", voice_port)),
         )

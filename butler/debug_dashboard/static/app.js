@@ -123,7 +123,7 @@ function eventKey(prefix, payload, index = 0) {
 }
 
 function eventDuration(event) {
-  const preferred = ["text_stream_total_ms", "agent_stream_total_ms", "llm_request_ms", "tool_execution_ms", "prompt_assembly_ms", "awareness_snapshot_ms"];
+  const preferred = ["text_stream_total_ms", "agent_stream_total_ms", "llm_request_ms", "tool_execution_ms", "prompt_assembly_ms", "state_snapshot_ms"];
   for (const key of preferred) if (event[key] !== null && event[key] !== undefined) return `${number(event[key])} ms`;
   return "--";
 }
@@ -287,7 +287,7 @@ function renderOperations(snapshot) {
   const latency = operations.latency_summary || {};
   const summary = byId("operations-summary");
   summary.textContent = `${traces.length} trace(s), ${failures} failed/interrupted | latency p50 ${number(latency.p50_ms)} ms / p95 ${number(latency.p95_ms)} ms | jobs: ${jobs.status} | awareness: ${awareness.status} | actions: ${actionFeed.status}`;
-  summary.className = `status-strip ${failures || awareness.status !== "available" ? "degraded" : ""}`;
+  summary.className = `status-strip ${failures ? "degraded" : ""}`;
 
   const traceRows = traces.filter((trace) => matchesFilter(trace.trace_id, trace.outcome, trace.components, trace.stages)).map((trace, index) => [
     cell(shortTime(trace.started_at), "nowrap"), cell(trace.trace_id, "nowrap"), cell(trace.session_id, "nowrap"), badge(trace.outcome), cell(`${number(trace.elapsed_ms)} ms`, "nowrap"),

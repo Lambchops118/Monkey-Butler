@@ -42,7 +42,7 @@ class MemoryStoreTests(unittest.TestCase):
                 self.assertEqual([m["role"] for m in history], ["user", "assistant", "tool", "assistant"])
                 self.assertEqual(history[1]["tool_calls"][0]["function"]["arguments"], '{"entity_id":"pump"}')
                 self.assertEqual(history[2], self._exchange()[1])
-                row = store._conn.execute("SELECT metadata_json FROM messages WHERE role='assistant'").fetchone()
+                row = store._conn.execute("SELECT metadata_json FROM conversation_messages WHERE role='assistant'").fetchone()
                 self.assertEqual(json.loads(row[0])["tool_history"]["schemas"], [schema])
                 self.assertEqual(history[1]["content"], "")
             finally:

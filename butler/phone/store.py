@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -9,9 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from butler.storage import DEFAULT_DB_PATH, connect_database, database_path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PHONE_DB_PATH = REPO_ROOT / "db" / "talos_phone.sqlite3"
+
+DEFAULT_PHONE_DB_PATH = DEFAULT_DB_PATH
 
 
 @dataclass(frozen=True)
@@ -86,20 +86,9 @@ class PhoneCallEvent:
 
 class PhoneCallStore:
     def __init__(self, db_path: str | Path | None = None) -> None:
-        selected_path = db_path or os.getenv("BUTLER_PHONE_DB_PATH") or DEFAULT_PHONE_DB_PATH
-        self.db_path = Path(selected_path) if str(selected_path) != ":memory:" else None
-        db_locator = ":memory:" if self.db_path is None else str(self.db_path)
-        if self.db_path is not None:
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
+        self.db_path = database_path(db_path)
         self._lock = threading.RLock()
-        self._conn = sqlite3.connect(db_locator, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        with self._lock:
-            self._conn.execute("PRAGMA foreign_keys = ON")
-            if self.db_path is not None:
-                self._conn.execute("PRAGMA journal_mode = WAL")
-            self._ensure_schema()
+        self._conn = connect_database(db_path)
 
     def close(self) -> None:
         with self._lock:
@@ -129,7 +118,7 @@ class PhoneCallStore:
         metadata: dict[str, Any] | None = None,
     ) -> PhoneCallRecord:
         now = _utc_now()
-        with self._lock:
+        with self._lock, self._conn:
             self._conn.execute(
                 """
                 INSERT INTO phone_calls (
@@ -217,7 +206,7 @@ class PhoneCallStore:
             params.append(value)
 
         params.append(_required_text(call_id, "call_id"))
-        with self._lock:
+        with self._lock, self._conn:
             cursor = self._conn.execute(
                 f"UPDATE phone_calls SET {', '.join(assignments)} WHERE call_id = ?",
                 params,
@@ -287,7 +276,7 @@ class PhoneCallStore:
         payload: dict[str, Any] | None = None,
     ) -> PhoneCallEvent:
         now = _utc_now()
-        with self._lock:
+        with self._lock, self._conn:
             cursor = self._conn.execute(
                 """
                 INSERT INTO phone_call_events (
@@ -401,57 +390,6 @@ class PhoneCallStore:
         latest = str(row["latest_updated_at"] or "").strip()
         return latest or None
 
-    def _ensure_schema(self) -> None:
-        self._conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS phone_calls (
-                call_id TEXT PRIMARY KEY,
-                provider TEXT NOT NULL,
-                provider_call_id TEXT,
-                conversation_id TEXT,
-                agent_id TEXT,
-                session_id TEXT,
-                direction TEXT NOT NULL,
-                remote_number TEXT NOT NULL,
-                contact_name TEXT,
-                purpose TEXT,
-                brief_context TEXT,
-                status TEXT NOT NULL,
-                outcome TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                started_at TEXT,
-                ended_at TEXT,
-                transcript_json TEXT NOT NULL DEFAULT '[]',
-                summary TEXT,
-                last_error TEXT,
-                metadata_json TEXT NOT NULL DEFAULT '{}'
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_phone_calls_updated
-            ON phone_calls(updated_at DESC, call_id DESC);
-
-            CREATE INDEX IF NOT EXISTS idx_phone_calls_provider_call_id
-            ON phone_calls(provider_call_id);
-
-            CREATE INDEX IF NOT EXISTS idx_phone_calls_session_id
-            ON phone_calls(session_id, updated_at DESC);
-
-            CREATE TABLE IF NOT EXISTS phone_call_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                call_id TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                message TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                payload_json TEXT NOT NULL DEFAULT '{}',
-                FOREIGN KEY(call_id) REFERENCES phone_calls(call_id) ON DELETE CASCADE
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_phone_call_events_call_id
-            ON phone_call_events(call_id, id);
-            """
-        )
-        self._conn.commit()
 
 
 _default_store: PhoneCallStore | None = None

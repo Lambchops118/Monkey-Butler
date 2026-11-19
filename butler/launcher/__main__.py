@@ -29,7 +29,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     # Optional per-run component overrides for headless mode.
     parser.add_argument("--no-ollama", action="store_true", help="Do not start Ollama.")
-    parser.add_argument("--no-awareness", action="store_true", help="Do not start the awareness backend or its DB.")
     parser.add_argument("--no-main", action="store_true", help="Do not start the main agent.")
     parser.add_argument("--no-voice", action="store_true", help="Do not start the voice worker.")
     parser.add_argument("--no-display", action="store_true", help="Do not start the InfoPanel display client.")
@@ -65,8 +64,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # Destructive maintenance actions. These run and exit; they do not start the
     # stack. Each requires --yes to actually proceed.
-    parser.add_argument("--clear-memory", action="store_true", help="Clear awareness + conversation memory, then exit.")
-    parser.add_argument("--clear-awareness-memory", action="store_true", help="Clear awareness long-term memory, then exit.")
+    parser.add_argument("--clear-memory", action="store_true", help="Clear conversation memory (including facts), then exit.")
     parser.add_argument("--clear-conversation-memory", action="store_true", help="Clear the persistent conversation store, then exit.")
     parser.add_argument("--yes", action="store_true", help="Confirm a --clear-* action non-interactively.")
     return parser
@@ -77,10 +75,8 @@ def _run_clear(args: argparse.Namespace) -> int:
 
     what = []
     if args.clear_memory:
-        what.append("awareness long-term memory AND the persistent conversation store")
+        what.append("the persistent conversation store (including saved facts)")
     else:
-        if args.clear_awareness_memory:
-            what.append("awareness long-term memory")
         if args.clear_conversation_memory:
             what.append("the persistent conversation store")
     target = " and ".join(what)
@@ -96,8 +92,6 @@ def _run_clear(args: argparse.Namespace) -> int:
         if args.clear_memory:
             print(maintenance.clear_all_memory())
         else:
-            if args.clear_awareness_memory:
-                print(maintenance.clear_awareness_memory())
             if args.clear_conversation_memory:
                 print(maintenance.clear_conversation_memory())
     except RuntimeError as exc:
@@ -135,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
     # Maintenance actions take precedence and never start the stack.
-    if args.clear_memory or args.clear_awareness_memory or args.clear_conversation_memory:
+    if args.clear_memory or args.clear_conversation_memory:
         return _run_clear(args)
 
     if not args.headless:
@@ -146,9 +140,6 @@ def main(argv: list[str] | None = None) -> int:
     cfg = LauncherConfig.load()
     if args.no_ollama:
         cfg.start_ollama = False
-    if args.no_awareness:
-        cfg.start_awareness = False
-        cfg.start_awareness_db = False
     if args.no_main:
         cfg.start_main = False
     if args.no_voice:

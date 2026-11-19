@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import queue
 import sqlite3
 import threading
@@ -11,11 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from butler.services import awareness_signals
+from butler.storage import DEFAULT_DB_PATH, connect_database, database_path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_JOB_DB_PATH = REPO_ROOT / "db" / "talos_jobs.sqlite3"
+
+DEFAULT_JOB_DB_PATH = DEFAULT_DB_PATH
 
 TERMINAL_STATUSES = {"succeeded", "failed", "cancelled", "interrupted"}
 
@@ -84,20 +83,9 @@ class JobEvent:
 
 class JobStore:
     def __init__(self, db_path: str | Path | None = None) -> None:
-        selected_path = db_path or os.getenv("BUTLER_JOBS_DB_PATH") or DEFAULT_JOB_DB_PATH
-        self.db_path = Path(selected_path) if str(selected_path) != ":memory:" else None
-        db_locator = ":memory:" if self.db_path is None else str(self.db_path)
-        if self.db_path is not None:
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
+        self.db_path = database_path(db_path)
         self._lock = threading.RLock()
-        self._conn = sqlite3.connect(db_locator, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        with self._lock:
-            self._conn.execute("PRAGMA foreign_keys = ON")
-            if self.db_path is not None:
-                self._conn.execute("PRAGMA journal_mode = WAL")
-            self._ensure_schema()
+        self._conn = connect_database(db_path)
 
     def close(self) -> None:
         with self._lock:
@@ -116,7 +104,7 @@ class JobStore:
     ) -> JobRecord:
         job_id = f"job_{uuid.uuid4().hex[:16]}"
         now = _utc_now()
-        with self._lock:
+        with self._lock, self._conn:
             self._conn.execute(
                 """
                 INSERT INTO jobs (
@@ -193,7 +181,7 @@ class JobStore:
             params.append(value)
 
         params.append(_required_text(job_id, "job_id"))
-        with self._lock:
+        with self._lock, self._conn:
             cursor = self._conn.execute(
                 f"UPDATE jobs SET {', '.join(assignments)} WHERE job_id = ?",
                 params,
@@ -217,7 +205,7 @@ class JobStore:
         metadata: dict[str, Any] | None = None,
     ) -> JobEvent:
         now = _utc_now()
-        with self._lock:
+        with self._lock, self._conn:
             cursor = self._conn.execute(
                 """
                 INSERT INTO job_events (
@@ -307,7 +295,7 @@ class JobStore:
 
     def mark_incomplete_jobs_interrupted(self) -> int:
         now = _utc_now()
-        with self._lock:
+        with self._lock, self._conn:
             rows = self._conn.execute(
                 """
                 SELECT job_id, session_id
@@ -340,47 +328,6 @@ class JobStore:
             self._conn.commit()
             return len(rows)
 
-    def _ensure_schema(self) -> None:
-        self._conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS jobs (
-                job_id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                source TEXT NOT NULL,
-                request_text TEXT NOT NULL,
-                status TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                started_at TEXT,
-                finished_at TEXT,
-                progress_message TEXT,
-                result_summary TEXT,
-                result_payload_json TEXT NOT NULL DEFAULT '{}',
-                error_message TEXT,
-                requires_user_input INTEGER NOT NULL DEFAULT 0,
-                resource_locks_json TEXT NOT NULL DEFAULT '[]',
-                metadata_json TEXT NOT NULL DEFAULT '{}'
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_jobs_session_status
-            ON jobs(session_id, status, updated_at DESC);
-
-            CREATE TABLE IF NOT EXISTS job_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                job_id TEXT NOT NULL,
-                session_id TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                message TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                metadata_json TEXT NOT NULL DEFAULT '{}',
-                FOREIGN KEY(job_id) REFERENCES jobs(job_id) ON DELETE CASCADE
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_job_events_session
-            ON job_events(session_id, id);
-            """
-        )
-        self._conn.commit()
 
 
 JobExecutor = Callable[[JobRecord], str]
@@ -497,18 +444,6 @@ class JobManager:
                 event_type="failed",
                 message=error_message,
             )
-            # A job the user asked for and that then failed is exactly the kind
-            # of thing the system should be able to raise on its own later.
-            awareness_signals.record_agent_event(
-                "agent.job.failed",
-                {
-                    "job_id": job.job_id,
-                    "session_id": job.session_id,
-                    "source": job.source,
-                    "error": _compact_text(error_message, limit=200),
-                },
-                severity="warning",
-            )
             return
 
         summary = _compact_text(response_text, limit=800)
@@ -525,15 +460,6 @@ class JobManager:
             session_id=job.session_id,
             event_type="completed",
             message=summary or "Background work completed.",
-        )
-        awareness_signals.record_agent_event(
-            "agent.job.completed",
-            {
-                "job_id": job.job_id,
-                "session_id": job.session_id,
-                "source": job.source,
-                "summary_chars": len(summary or ""),
-            },
         )
 
 

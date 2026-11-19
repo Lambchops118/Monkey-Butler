@@ -586,3 +586,45 @@ Consequences:
 Requirements affected:
 Supersedes / superseded by:
 ```
+
+## ADR-058 - Retire awareness without replacing conversation memory
+
+Date: 2026-11-18. Status: accepted (explicit owner assignment).
+
+The owner requested decoupling and archiving the awareness subsystem on the current branch, with incremental scoped replacements to follow separately. Move its implementation, migrations, provider/client/signal integration, isolated tests and deployment manifests into `archive/awareness/`; remove active startup, HTTP/signal/fact-mirroring and tool registrations. Retire pump/fan controls with their action authority instead of introducing a direct execution bypass. Preserve the SQLite conversational engine, paired tool history and saved facts, independent integrations, existing data/volumes/environments and firmware. Dashboard compatibility fields may report `archived`, but never poll or advertise the retired system as operational. No replacement module or database migration is authorized by this retirement. Earlier phase-completion and deployment records are historical. See RETIREMENT_2026-11-18.md for validation and remaining limitations.
+
+
+## ADR-059 - Devices is the first replacement subject; keep its scope explicit
+
+Date: 2026-11-18. Status: accepted scope direction; implementation design proposed.
+
+The owner selected Devices first and requested an explicit defense against the
+scope creep of the retired awareness subsystem, plus a historical retrospective.
+Conversation history remains owned by the conversation engine. The Devices
+proposal covers known-device identity, actual observations, qualified current
+state and communication health, with structured reads and a device-only summary.
+Human context, memory/analytics, alerts/attention, reminders and briefings are
+outside this assignment. The owner asked for an evaluation of per-turn summaries;
+this document recommends them with coverage/freshness/permission guarantees but
+does not record that mechanism, storage choice or polling intervals as approved
+implementation. No action restoration or direct execution bypass is authorized.
+See ../DEVICES_SYSTEM_DESIGN.md and ../AWARENESS_RETROSPECTIVE.md. Stop at design.
+
+
+## ADR-060 - One application SQLite database with domain ownership
+
+Date: 2026-11-18. Status: accepted (explicit owner implementation request).
+
+The owner waived importing existing conversation/job/phone data and authorized
+unifying active storage now. Use `db/butler.sqlite3`, with one `BUTLER_DB_PATH`
+override, shared SQLite settings and atomic versioned/checksummed migrations at
+Butler startup. Conversation owns `conversation_*`; jobs owns `jobs`/`job_events`;
+phone owns `phone_calls`/`phone_call_events`; storage owns its migration ledger.
+Stores retain domain APIs and independent connections/thread locks, with short
+transactions and rollback. Shared storage does not merge product responsibilities.
+Memory clearing deletes only owned rows, never the file. Dashboard projections
+are read-only. Old per-module file settings are retired; old files are preserved
+but not imported/selected. Future modules append migrations only when assigned,
+without speculative tables or a separate server. This supersedes the earlier
+proposal for a dedicated Devices database file and separate conversation file;
+conversation ownership remains unchanged. Details/validation: ../DATABASE.md.

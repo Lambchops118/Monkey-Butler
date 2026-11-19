@@ -7,7 +7,7 @@ Two kinds of state live here:
    probe each service, and can write a few of them back (comment-preserving) so
    the GUI can edit them in place.
 2. **Launcher-only choices** — which components to start, whether to manage
-   Ollama/Docker, and the GPU assignment. These are stored in
+   Ollama, and the GPU assignment. These are stored in
    ``launcher.config.json`` at the repo root (git-ignored).
 
 Everything here is deliberately dependency-free (standard library only) so the
@@ -47,20 +47,17 @@ VENV_DIRS = {
     "main": ".venv-runtime",
     "voice": ".venv-runtime",
     "display": ".venv-display",
-    "awareness": ".venv-awareness",
 }
 
 # Requirements manifest each dedicated venv is built from (for setup hints).
 VENV_REQUIREMENTS = {
     ".venv-runtime": "requirements/runtime-py312.txt",
     ".venv-display": "requirements/display-py312.txt",
-    ".venv-awareness": "requirements/awareness-py312.txt",
 }
 
 # Fallback ("legacy") venv used only for components without a dedicated venv.
 FALLBACK_VENV = ".venv"
 
-DOCKER_COMPOSE_FILE = "docker-compose.awareness.yml"
 
 
 def _venv_interpreter(rel: str) -> Path | None:
@@ -125,11 +122,6 @@ _SETTINGS_DEFAULTS = {
     "BUTLER_LLM_MODEL": "hermes3:8b",
     "BUTLER_LLM_BASE_URL": "http://127.0.0.1:11434/v1",
     "BUTLER_LLM_THINK_MODE": "off",
-    "BUTLER_AWARENESS_MQTT_ENABLED": "1",
-    "BUTLER_AWARENESS_MQTT_HOST": "192.168.1.160",
-    "BUTLER_AWARENESS_MQTT_PORT": "1883",
-    "BUTLER_AWARENESS_API_PORT": "8600",
-    "BUTLER_AWARENESS_API_HOST": "127.0.0.1",
     "TEXT_AGENT_PORT": "8420",
     "TEXT_AGENT_HOST": "localhost",
 }
@@ -387,19 +379,13 @@ def mcp_catalog() -> list[McpEntry]:
             key="butler-local",
             label="butler-local (built-in tool server)",
             kind="server",
-            detail="home automation, awareness",
+            detail="time, weather, smart switches, display and messaging",
         ),
         McpEntry(
             key="home_automation",
             label="Home automation tools",
             kind="provider",
-            detail="lights, switches, scenes",
-        ),
-        McpEntry(
-            key="awareness",
-            label="Awareness / memory tools",
-            kind="provider",
-            detail="presence, state, long-term memory",
+            detail="current time and weather",
         ),
         McpEntry(
             key="discord_messages",
@@ -488,8 +474,6 @@ class LauncherConfig:
 
     # Components to launch, in dependency order.
     start_ollama: bool = True
-    start_awareness_db: bool = True
-    start_awareness: bool = True
     start_main: bool = True
     start_voice: bool = True
     start_display: bool = True
@@ -510,8 +494,6 @@ class LauncherConfig:
 
     # Whether the launcher manages these itself vs. assuming they're already up.
     manage_ollama: bool = True
-    manage_docker: bool = True
-    run_migrations: bool = True
 
     # GPU pinning. -1 means "no pin" (let CUDA see every card).
     llm_gpu_index: int = 0
@@ -665,9 +647,7 @@ class Ports:
     """Ports the launcher probes for readiness, read from settings.env."""
 
     ollama: int = 11434
-    awareness: int = field(default=8600)
     text_agent: int = field(default=8420)
-    awareness_host: str = "127.0.0.1"
     text_agent_host: str = "localhost"
 
     @classmethod
@@ -680,8 +660,6 @@ class Ports:
 
         return cls(
             ollama=11434,
-            awareness=as_int("BUTLER_AWARENESS_API_PORT", 8600),
             text_agent=as_int("TEXT_AGENT_PORT", 8420),
-            awareness_host=get_setting("BUTLER_AWARENESS_API_HOST", "127.0.0.1"),
             text_agent_host=get_setting("TEXT_AGENT_HOST", "localhost"),
         )

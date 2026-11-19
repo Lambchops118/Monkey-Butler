@@ -2,7 +2,7 @@
 # - InfoPanel
 # - Voice Worker
 # - Ollama backend
-# - Postgres container
+# - Main agent (opens the shared SQLite database itself)
 
 """
     python -m butler.launcher            # GUI (default)

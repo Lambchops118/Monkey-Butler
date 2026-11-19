@@ -10,9 +10,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from butler.storage import DEFAULT_DB_PATH, connect_database, database_path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MEMORY_DB_PATH = REPO_ROOT / "db" / "talos_memory.sqlite3"
+
+DEFAULT_MEMORY_DB_PATH = DEFAULT_DB_PATH
 DEFAULT_PROJECT_ID = "Butler"
 MAX_QUERY_TOKENS = 8
 
@@ -29,20 +30,9 @@ class MemoryFact:
 
 class MemoryStore:
     def __init__(self, db_path: str | Path | None = None) -> None:
-        selected_path = db_path or os.getenv("BUTLER_MEMORY_DB_PATH") or DEFAULT_MEMORY_DB_PATH
-        self.db_path = Path(selected_path) if str(selected_path) != ":memory:" else None
-        db_locator = ":memory:" if self.db_path is None else str(self.db_path)
-        if self.db_path is not None:
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
+        self.db_path = database_path(db_path)
         self._lock = threading.RLock()
-        self._conn = sqlite3.connect(db_locator, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        with self._lock:
-            self._conn.execute("PRAGMA foreign_keys = ON")
-            if self.db_path is not None:
-                self._conn.execute("PRAGMA journal_mode = WAL")
-            self._ensure_schema()
+        self._conn = connect_database(db_path)
 
     def close(self) -> None:
         with self._lock:
@@ -58,17 +48,17 @@ class MemoryStore:
         session_id = _required_text(session_id, "session_id")
         now = _utc_now()
         metadata_json = _json_dumps(metadata or {})
-        with self._lock:
+        with self._lock, self._conn:
             self._conn.execute(
                 """
-                INSERT INTO sessions (session_id, title, created_at, updated_at, metadata_json)
+                INSERT INTO conversation_sessions (session_id, title, created_at, updated_at, metadata_json)
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(session_id) DO UPDATE SET
-                    title = COALESCE(excluded.title, sessions.title),
+                    title = COALESCE(excluded.title, conversation_sessions.title),
                     updated_at = excluded.updated_at,
                     metadata_json = CASE
                         WHEN excluded.metadata_json != '{}' THEN excluded.metadata_json
-                        ELSE sessions.metadata_json
+                        ELSE conversation_sessions.metadata_json
                     END
                 """,
                 (session_id, title, now, now, metadata_json),
@@ -88,16 +78,16 @@ class MemoryStore:
         content = _required_text(content, "content")
         self.record_session(session_id)
         now = _utc_now()
-        with self._lock:
+        with self._lock, self._conn:
             cursor = self._conn.execute(
                 """
-                INSERT INTO messages (session_id, role, content, created_at, metadata_json)
+                INSERT INTO conversation_messages (session_id, role, content, created_at, metadata_json)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (session_id, role, content, now, _json_dumps(metadata or {})),
             )
             self._conn.execute(
-                "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
+                "UPDATE conversation_sessions SET updated_at = ? WHERE session_id = ?",
                 (now, session_id),
             )
             self._conn.commit()
@@ -142,16 +132,16 @@ class MemoryStore:
         now = _utc_now()
         with self._lock, self._conn:
             self._conn.execute(
-                "INSERT INTO messages (session_id, role, content, created_at, metadata_json) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO conversation_messages (session_id, role, content, created_at, metadata_json) VALUES (?, ?, ?, ?, ?)",
                 (session_id, "user", user_message, now, user_metadata_json),
             )
             if assistant_message.strip() or tool_messages:
                 self._conn.execute(
-                    "INSERT INTO messages (session_id, role, content, created_at, metadata_json) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO conversation_messages (session_id, role, content, created_at, metadata_json) VALUES (?, ?, ?, ?, ?)",
                     (session_id, "assistant", assistant_message, now, assistant_metadata_json),
                 )
             self._conn.execute(
-                "UPDATE sessions SET updated_at = ? WHERE session_id = ?", (now, session_id)
+                "UPDATE conversation_sessions SET updated_at = ? WHERE session_id = ?", (now, session_id)
             )
         self.refresh_session_summary(session_id)
 
@@ -170,11 +160,11 @@ class MemoryStore:
         """
         session_id = _required_text(session_id, "session_id")
         content = _required_text(content, "content")
-        with self._lock:
+        with self._lock, self._conn:
             row = self._conn.execute(
                 """
                 SELECT id, role
-                FROM messages
+                FROM conversation_messages
                 WHERE session_id = ? AND role IN ('user', 'assistant')
                   AND (? IS NULL OR json_extract(metadata_json, '$.request_id') = ?)
                 ORDER BY id DESC
@@ -186,7 +176,7 @@ class MemoryStore:
                 return False
             if str(row["role"]) == "assistant":
                 self._conn.execute(
-                    "UPDATE messages SET content = ? WHERE id = ?",
+                    "UPDATE conversation_messages SET content = ? WHERE id = ?",
                     (content, int(row["id"])),
                 )
                 self._conn.commit()
@@ -194,7 +184,7 @@ class MemoryStore:
                 # Insert only if the targeted user entry is still the latest.
                 # A late interrupt must never append text to a newer exchange.
                 if request_id and self._conn.execute(
-                    "SELECT MAX(id) FROM messages WHERE session_id = ?", (session_id,)
+                    "SELECT MAX(id) FROM conversation_messages WHERE session_id = ?", (session_id,)
                 ).fetchone()[0] != row["id"]:
                     return False
                 self.record_message(
@@ -211,7 +201,7 @@ class MemoryStore:
             rows = self._conn.execute(
                 """
                 SELECT role, content
-                FROM messages
+                FROM conversation_messages
                 WHERE session_id = ?
                 ORDER BY id DESC
                 LIMIT ?
@@ -256,7 +246,7 @@ class MemoryStore:
             rows = self._conn.execute(
                 """
                 SELECT role, content, metadata_json
-                FROM messages
+                FROM conversation_messages
                 WHERE session_id = ? AND role IN ('user', 'assistant')
                 ORDER BY id DESC
                 LIMIT ?
@@ -306,10 +296,10 @@ class MemoryStore:
         return [message for unit in reversed(selected) for message in unit]
 
     def list_session_ids(self) -> list[str]:
-        """Every session_id with a row in ``sessions``, for a caller that wants
+        """Every session_id with a row in ``conversation_sessions``, for a caller that wants
         to clear or inspect all conversations without knowing their ids up front."""
         with self._lock:
-            rows = self._conn.execute("SELECT session_id FROM sessions").fetchall()
+            rows = self._conn.execute("SELECT session_id FROM conversation_sessions").fetchall()
         return [str(row["session_id"]) for row in rows]
 
     def clear_session(self, session_id: str) -> None:
@@ -319,16 +309,23 @@ class MemoryStore:
         intentionally not deleted by a conversation reset.
         """
         session_id = _required_text(session_id, "session_id")
-        with self._lock:
+        with self._lock, self._conn:
             self._conn.execute(
-                "DELETE FROM summaries WHERE scope = 'session' AND scope_id = ?",
+                "DELETE FROM conversation_summaries WHERE scope = 'session' AND scope_id = ?",
                 (session_id,),
             )
             self._conn.execute(
-                "DELETE FROM sessions WHERE session_id = ?",
+                "DELETE FROM conversation_sessions WHERE session_id = ?",
                 (session_id,),
             )
             self._conn.commit()
+
+    def clear_all(self) -> None:
+        """Clear conversation-owned rows only; preserve jobs, calls and schema."""
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM conversation_sessions")
+            self._conn.execute("DELETE FROM conversation_facts")
+            self._conn.execute("DELETE FROM conversation_summaries")
 
     def upsert_fact(
         self,
@@ -344,17 +341,17 @@ class MemoryStore:
         value = _required_text(value, "value")
         salience = max(1, min(10, int(salience)))
         now = _utc_now()
-        with self._lock:
+        with self._lock, self._conn:
             self._conn.execute(
                 """
-                INSERT INTO facts (
+                INSERT INTO conversation_facts (
                     scope, key, value, salience, source_session_id, created_at, updated_at
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(scope, key) DO UPDATE SET
                     value = excluded.value,
                     salience = excluded.salience,
-                    source_session_id = COALESCE(excluded.source_session_id, facts.source_session_id),
+                    source_session_id = COALESCE(excluded.source_session_id, conversation_facts.source_session_id),
                     updated_at = excluded.updated_at
                 """,
                 (scope, key, value, salience, source_session_id, now, now),
@@ -364,9 +361,9 @@ class MemoryStore:
     def delete_fact(self, scope: str, key: str) -> bool:
         scope = _required_text(scope, "scope")
         key = _required_text(key, "key")
-        with self._lock:
+        with self._lock, self._conn:
             cursor = self._conn.execute(
-                "DELETE FROM facts WHERE scope = ? AND key = ?",
+                "DELETE FROM conversation_facts WHERE scope = ? AND key = ?",
                 (scope, key),
             )
             self._conn.commit()
@@ -377,10 +374,10 @@ class MemoryStore:
         scope_id = _required_text(scope_id, "scope_id")
         summary = _required_text(summary, "summary")
         now = _utc_now()
-        with self._lock:
+        with self._lock, self._conn:
             self._conn.execute(
                 """
-                INSERT INTO summaries (scope, scope_id, summary, updated_at)
+                INSERT INTO conversation_summaries (scope, scope_id, summary, updated_at)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(scope, scope_id) DO UPDATE SET
                     summary = excluded.summary,
@@ -402,7 +399,7 @@ class MemoryStore:
                 rows = self._conn.execute(
                     f"""
                     SELECT id, scope, key, value, salience, updated_at
-                    FROM facts
+                    FROM conversation_facts
                     WHERE {clauses}
                     ORDER BY salience DESC, updated_at DESC
                     LIMIT ?
@@ -415,7 +412,7 @@ class MemoryStore:
             rows = self._conn.execute(
                 """
                 SELECT id, scope, key, value, salience, updated_at
-                FROM facts
+                FROM conversation_facts
                 ORDER BY salience DESC, updated_at DESC
                 LIMIT ?
                 """,
@@ -447,7 +444,7 @@ class MemoryStore:
                 row = self._conn.execute(
                     """
                     SELECT summary
-                    FROM summaries
+                    FROM conversation_summaries
                     WHERE scope = ? AND scope_id = ?
                     """,
                     (scope, scope_id),
@@ -467,59 +464,6 @@ class MemoryStore:
         prompt_memory = "Butler durable memory (compact, read-only):\n" + "\n".join(lines)
         return _truncate_block(prompt_memory, max_chars=max_chars)
 
-    def _ensure_schema(self) -> None:
-        self._conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS sessions (
-                session_id TEXT PRIMARY KEY,
-                title TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                metadata_json TEXT NOT NULL DEFAULT '{}'
-            );
-
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                metadata_json TEXT NOT NULL DEFAULT '{}',
-                FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_messages_session_id
-            ON messages(session_id, id);
-
-            CREATE TABLE IF NOT EXISTS facts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                scope TEXT NOT NULL,
-                key TEXT NOT NULL,
-                value TEXT NOT NULL,
-                salience INTEGER NOT NULL DEFAULT 5,
-                source_session_id TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                UNIQUE(scope, key)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_facts_salience
-            ON facts(salience DESC, updated_at DESC);
-
-            CREATE TABLE IF NOT EXISTS summaries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                scope TEXT NOT NULL,
-                scope_id TEXT NOT NULL,
-                summary TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                UNIQUE(scope, scope_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_summaries_scope
-            ON summaries(scope, scope_id);
-            """
-        )
-        self._conn.commit()
 
 
 def _validated_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
