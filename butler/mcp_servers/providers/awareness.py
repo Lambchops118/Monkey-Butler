@@ -240,7 +240,9 @@ def register(server: FastMCP) -> None:
         is unsupported because water_plants does not cover it. The response includes the action_request_id and
         status — 'awaiting_confirmation' means the user must approve before
         anything is dispatched; check progress with get_action_status.
-        Supply and reuse `idempotency_key` when retrying the same user intent.
+        The agent runtime binds `idempotency_key` and correlation to the current
+        user intent; reuse is valid only for a retry of that exact action and
+        parameters.
         Dispatch, acknowledgement, timeout, and completion are tracked
         truthfully: silence is never success."""
         try:

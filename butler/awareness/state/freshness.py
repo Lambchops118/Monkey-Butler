@@ -111,6 +111,54 @@ async def record_source_health_change(
     )
 
 
+async def mark_source_state_offline(
+    connection: AsyncConnection, source_id: str, now: datetime
+) -> int:
+    """Mark every current value from one source offline in the same transaction.
+
+    Both deadline expiry and an explicit device last-will use this path so the
+    source row and its derived state cannot disagree about reachability.
+    """
+    rows = (
+        await connection.execute(
+            sa.select(
+                CurrentState.entity_id,
+                CurrentState.property_name,
+                CurrentState.value_json,
+                CurrentState.state_status,
+            )
+            .where(
+                CurrentState.source_id == source_id,
+                CurrentState.state_status.in_(("current", "inferred", "stale")),
+            )
+            .with_for_update()
+        )
+    ).all()
+    for row in rows:
+        await connection.execute(
+            sa.update(CurrentState)
+            .where(
+                CurrentState.entity_id == row.entity_id,
+                CurrentState.property_name == row.property_name,
+            )
+            .values(state_status="offline")
+        )
+        await connection.execute(
+            sa.insert(StateTransition).values(
+                entity_id=row.entity_id,
+                property_name=row.property_name,
+                occurred_at=now,
+                from_value=row.value_json,
+                to_value=row.value_json,
+                from_status=row.state_status,
+                to_status="offline",
+                reason="offline",
+                metadata_json={"source_id": source_id},
+            )
+        )
+    return len(rows)
+
+
 class FreshnessWorker:
     def __init__(
         self,
@@ -291,7 +339,7 @@ class FreshnessWorker:
                 reason=f"silent for {silence:.0f}s (deadline {deadline:.0f}s)",
             )
             count += 1
-            count += await self._mark_source_state_offline(connection, row.source_id, now)
+            count += await mark_source_state_offline(connection, row.source_id, now)
             await self._notify(
                 connection,
                 {
@@ -302,48 +350,6 @@ class FreshnessWorker:
                 },
             )
         return count
-
-    async def _mark_source_state_offline(
-        self, connection: AsyncConnection, source_id: str, now: datetime
-    ) -> int:
-        rows = (
-            await connection.execute(
-                sa.select(
-                    CurrentState.entity_id,
-                    CurrentState.property_name,
-                    CurrentState.value_json,
-                    CurrentState.state_status,
-                )
-                .where(
-                    CurrentState.source_id == source_id,
-                    CurrentState.state_status.in_(("current", "inferred", "stale")),
-                )
-                .with_for_update()
-            )
-        ).all()
-        for row in rows:
-            await connection.execute(
-                sa.update(CurrentState)
-                .where(
-                    CurrentState.entity_id == row.entity_id,
-                    CurrentState.property_name == row.property_name,
-                )
-                .values(state_status="offline")
-            )
-            await connection.execute(
-                sa.insert(StateTransition).values(
-                    entity_id=row.entity_id,
-                    property_name=row.property_name,
-                    occurred_at=now,
-                    from_value=row.value_json,
-                    to_value=row.value_json,
-                    from_status=row.state_status,
-                    to_status="offline",
-                    reason="offline",
-                    metadata_json={"source_id": source_id},
-                )
-            )
-        return len(rows)
 
     async def _notify(
         self, connection: AsyncConnection, transition: dict[str, Any]

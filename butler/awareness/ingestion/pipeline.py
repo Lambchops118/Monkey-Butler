@@ -37,10 +37,21 @@ from butler.awareness.logging_utils import get_logger
 from butler.awareness.registry.sources import SourceRecord, SourceRepository
 from butler.awareness.schemas.events import EventEnvelope, PayloadTooLargeError
 from butler.awareness.state.classification import classify
-from butler.awareness.state.freshness import record_source_health_change
+from butler.awareness.state.freshness import (
+    mark_source_state_offline,
+    record_source_health_change,
+)
 from butler.awareness.state.manager import StateManager
 
 logger = get_logger("butler.awareness.ingestion.pipeline")
+
+
+def _is_explicit_offline(envelope: EventEnvelope) -> bool:
+    return (
+        envelope.event_type.endswith(".health.reported")
+        and envelope.payload.get("online") is False
+        and envelope.payload.get("reason") == "last_will"
+    )
 
 
 @dataclass(frozen=True)
@@ -204,8 +215,12 @@ class IngestionPipeline:
         if arrival_notes:
             envelope.provenance.metadata["arrival"] = arrival_notes
 
+        explicit_offline = _is_explicit_offline(envelope)
+        counts_as_live = not message.retained and not explicit_offline
+
         if assessment.treat_as_duplicate:
-            await self._touch_source(source.source_id, received_at)
+            if counts_as_live:
+                await self._touch_source(source, received_at)
             self.metrics.duplicates += 1
             return "duplicate"
 
@@ -214,10 +229,11 @@ class IngestionPipeline:
         )
         if disposition == "duplicate":
             self.metrics.duplicates += 1
-            await self._touch_source(source.source_id, received_at)
+            if counts_as_live:
+                await self._touch_source(source, received_at)
             return "duplicate"
 
-        if assessment.advance:
+        if assessment.advance and counts_as_live:
             self._sources.note_advance(
                 envelope.source_id, envelope.sequence, envelope.source_boot_id
             )
@@ -278,63 +294,114 @@ class IngestionPipeline:
             .on_conflict_do_nothing(index_elements=["event_id"])
         )
 
-        source_update = {
-            "last_received_at": received_at,
-            "health_status": "healthy",
-            "updated_at": datetime.now(timezone.utc),
-        }
-        if envelope.observed_at is not None:
-            source_update["last_observed_at"] = envelope.observed_at
-        if advance and envelope.sequence is not None:
-            source_update["last_sequence"] = envelope.sequence
-            source_update["last_boot_id"] = envelope.source_boot_id
-
         effects = classify(envelope)
+        retained = bool(envelope.provenance.retained)
+        explicit_offline = _is_explicit_offline(envelope)
+        # Retained traffic is broker replay, not proof that a device is live.
+        # An explicit last-will is still valid offline evidence, whether it is
+        # delivered live or replayed after the subscriber reconnects.
+        counts_as_live = not retained and not explicit_offline
+        target_health = (
+            "offline" if explicit_offline else "healthy" if counts_as_live else None
+        )
+
+        source_update: dict[str, Any] = {}
+        if target_health is not None:
+            source_update.update(
+                health_status=target_health,
+                updated_at=datetime.now(timezone.utc),
+            )
+        if counts_as_live:
+            source_update["last_received_at"] = received_at
+            if envelope.observed_at is not None:
+                source_update["last_observed_at"] = envelope.observed_at
+            if advance and envelope.sequence is not None:
+                source_update["last_sequence"] = envelope.sequence
+                source_update["last_boot_id"] = envelope.source_boot_id
 
         try:
             async with self._engine.begin() as connection:
                 result = await connection.execute(insert_stmt)
                 inserted = bool(result.rowcount)
                 if inserted:
-                    previous_health = (
+                    previous_source = (
                         await connection.execute(
-                            sa.select(Source.health_status)
+                            sa.select(
+                                Source.health_status,
+                                Source.last_received_at,
+                            )
                             .where(Source.source_id == envelope.source_id)
                             .with_for_update()
                         )
-                    ).scalar_one_or_none()
-                    await connection.execute(
-                        sa.update(Source)
-                        .where(Source.source_id == envelope.source_id)
-                        .values(**source_update)
+                    ).one_or_none()
+                    previous_health = (
+                        previous_source.health_status if previous_source else None
                     )
-                    if previous_health is not None and previous_health != "healthy":
+                    if source_update:
+                        await connection.execute(
+                            sa.update(Source)
+                            .where(Source.source_id == envelope.source_id)
+                            .values(**source_update)
+                        )
+                    if (
+                        target_health is not None
+                        and previous_health is not None
+                        and previous_health != target_health
+                    ):
+                        reason = (
+                            "retained_last_will_replay"
+                            if explicit_offline and retained
+                            else "last_will"
+                            if explicit_offline
+                            else "live_message_received"
+                        )
                         await record_source_health_change(
                             connection,
                             source_id=envelope.source_id,
-                            new_status="healthy",
+                            new_status=target_health,
                             previous_status=previous_health,
                             changed_at=received_at,
-                            reason="message_received",
+                            reason=reason,
                         )
                         if self._rule_engine is not None:
-                            await self._rule_engine.apply_source_recovered(
-                                connection, source_id=envelope.source_id
-                            )
+                            if target_health == "healthy":
+                                await self._rule_engine.apply_source_recovered(
+                                    connection, source_id=envelope.source_id
+                                )
+                            else:
+                                silence_seconds = (
+                                    max(
+                                        0.0,
+                                        (
+                                            received_at
+                                            - previous_source.last_received_at
+                                        ).total_seconds(),
+                                    )
+                                    if previous_source is not None
+                                    and previous_source.last_received_at is not None
+                                    else 0.0
+                                )
+                                await self._rule_engine.apply_source_offline(
+                                    connection,
+                                    source_id=envelope.source_id,
+                                    source_type=source.source_type,
+                                    silence_seconds=silence_seconds,
+                                )
                     # Phase 3+4 effects share the event transaction
                     # (INGEST-005); everything here is local database work,
                     # never network/LLM.
                     entity_id = await self._resolve_entity(
                         connection, envelope.entity_id, source
                     )
-                    if self._rule_engine is not None:
+                    effects_allowed = not retained or explicit_offline
+                    if self._rule_engine is not None and effects_allowed:
                         await self._rule_engine.apply_event(
                             connection, envelope, entity_id
                         )
-                    if self._action_service is not None:
+                    if self._action_service is not None and not retained:
                         # Command acks / state evidence complete pending actions.
                         await self._action_service.observe_event(connection, envelope)
-                    if effects.telemetry or effects.state_updates:
+                    if effects_allowed and (effects.telemetry or effects.state_updates):
                         if entity_id is None:
                             logger.warning(
                                 "no registered entity for event %s (claimed %r); "
@@ -361,6 +428,10 @@ class IngestionPipeline:
                                 await self._state_manager.apply(
                                     connection, envelope, updates, source
                                 )
+                    if explicit_offline:
+                        await mark_source_state_offline(
+                            connection, envelope.source_id, received_at
+                        )
         except IntegrityError:
             # Partial unique (source_id, source_boot_id, sequence): redelivery
             # of the same device message under a different event_id.
@@ -386,14 +457,40 @@ class IngestionPipeline:
                 return candidate
         return None
 
-    async def _touch_source(self, source_id: str, received_at: datetime) -> None:
-        """A duplicate still proves the source is alive."""
+    async def _touch_source(
+        self, source: SourceRecord, received_at: datetime
+    ) -> None:
+        """A live duplicate still proves the source is alive."""
         async with self._engine.begin() as connection:
+            previous_health = (
+                await connection.execute(
+                    sa.select(Source.health_status)
+                    .where(Source.source_id == source.source_id)
+                    .with_for_update()
+                )
+            ).scalar_one_or_none()
             await connection.execute(
                 sa.update(Source)
-                .where(Source.source_id == source_id)
-                .values(last_received_at=received_at, updated_at=datetime.now(timezone.utc))
+                .where(Source.source_id == source.source_id)
+                .values(
+                    last_received_at=received_at,
+                    health_status="healthy",
+                    updated_at=datetime.now(timezone.utc),
+                )
             )
+            if previous_health is not None and previous_health != "healthy":
+                await record_source_health_change(
+                    connection,
+                    source_id=source.source_id,
+                    new_status="healthy",
+                    previous_status=previous_health,
+                    changed_at=received_at,
+                    reason="live_duplicate_received",
+                )
+                if self._rule_engine is not None:
+                    await self._rule_engine.apply_source_recovered(
+                        connection, source_id=source.source_id
+                    )
 
     async def _reject(
         self,

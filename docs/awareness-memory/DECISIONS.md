@@ -540,6 +540,37 @@ in-memory GUI queue, because it cannot cross a machine boundary; letting a
 remote display read the main host's sleep-state file, because that creates a
 shared-filesystem dependency and multiple sources of truth.
 
+## ADR-056 — Pump reachability requires live traffic and retained health symmetry
+
+Date: 2026-11-14. Status: accepted (owner-approved bounded repair).
+
+The canonical plant-waterer publishes a unique retained `online=false`
+last-will for each MQTT session and immediately overwrites it with retained
+`online=true` health after connecting. Retained replay remains immutable event
+evidence but never refreshes source liveness, advances sequence state, or
+recovers health; only live non-last-will traffic does. A live or replayed
+last-will marks the source and its derived state offline immediately. The
+source-specific silence deadline is 120 seconds, four missed 30-second
+heartbeats and slightly longer than the firmware's 90-second MQTT inactivity
+detector.
+
+This replaces the incorrect assumption that a non-retained reconnect snapshot
+clears a retained will, and the ingestion behavior that called any received
+message healthy even when its payload explicitly said `online=false`.
+
+## ADR-057 — Pump starts fail closed and action speech follows lifecycle evidence
+
+Date: 2026-11-14. Status: accepted (owner-approved bounded repair).
+
+`run_pump` requires `quad_pump_canonical` health to be `healthy` both at request
+validation and immediately before outbox dispatch. `stop_pump` remains
+dispatchable while reachability is uncertain. The agent runtime, not the
+model, binds physical-action idempotency/correlation to the current request and
+renders the returned lifecycle deterministically: approved/dispatched is
+awaiting acknowledgement, while only completed evidence may be spoken as
+confirmed. This prevents stale cross-turn idempotency reuse and model prose
+from turning approval into a false claim of physical activation.
+
 ## New decision template
 
 ```text

@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 FIRMWARE_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -976,6 +977,42 @@ def _connect(supervisor, clock):
 
 
 class NetworkSupervisorTest(unittest.TestCase):
+    def test_last_will_factory_runs_for_each_mqtt_session(self):
+        wills = []
+        counter = [0]
+
+        class RecordingClient(FakeMQTTClient):
+            def __init__(self, *args, **kwargs):
+                super().__init__()
+
+            def set_callback(self, callback):
+                self.callback = callback
+
+            def set_last_will(self, topic, payload, retain=False, qos=0):
+                wills.append((topic, payload, retain, qos))
+
+            def connect(self, **kwargs):
+                return None
+
+            def subscribe(self, topic, qos=0):
+                return None
+
+        def next_will():
+            counter[0] += 1
+            return b"health", ("offline-%d" % counter[0]).encode()
+
+        supervisor = net.NetworkSupervisor(
+            "cid", "broker", lambda *args: None, FakeClock(), last_will=next_will
+        )
+        with mock.patch.object(
+            net, "_retain_aware_client_class", return_value=RecordingClient
+        ):
+            supervisor._connect_mqtt()
+            supervisor._connect_mqtt()
+
+        self.assertEqual([item[1] for item in wills], [b"offline-1", b"offline-2"])
+        self.assertTrue(all(item[2] for item in wills))
+
     def test_watchdog_budget_covers_the_worst_blocking_step(self):
         # The regression that caused the 2026-09-01 reset loop: connect and
         # CONNACK are the only blocking work left in one watchdog interval, and

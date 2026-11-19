@@ -71,11 +71,11 @@ PRERAMP_MIN_INTERVAL_SECONDS = max(
 PROMPT_MEMORY_CHAR_LIMIT = max(0, env_int("BUTLER_PROMPT_MEMORY_CHAR_LIMIT", 1600))
 CONVERSATION_HISTORY_MESSAGE_LIMIT = max(
     0,
-    env_int("BUTLER_CONVERSATION_HISTORY_MESSAGE_LIMIT", 8),
+    env_int("BUTLER_CONVERSATION_HISTORY_MESSAGE_LIMIT", 32),
 )
 CONVERSATION_HISTORY_CHAR_LIMIT = max(
     0,
-    env_int("BUTLER_CONVERSATION_HISTORY_CHAR_LIMIT", 4000),
+    env_int("BUTLER_CONVERSATION_HISTORY_CHAR_LIMIT", 16000),
 )
 # How long an interruption record waits for the interrupted turn to release the
 # conversation lock before recording anyway (it may be inside a slow tool call).
@@ -2432,6 +2432,80 @@ def _deterministic_pump_result_message(
     )
 
 
+def _bind_physical_action_idempotency(
+    call: LLMToolCall, *, request_id: str
+) -> LLMToolCall:
+    """Bind mutation identity to this runtime turn, never to model prose.
+
+    Recovered and structured tool calls use the same request id, so a retry in
+    this turn deduplicates; a later user intent receives a different key.
+    """
+    if call.name not in PHYSICAL_ACTION_TOOL_NAMES:
+        return call
+    try:
+        arguments = parse_tool_arguments(call.arguments)
+    except Exception:
+        return call
+    if not isinstance(arguments, dict):
+        return call
+    arguments["idempotency_key"] = f"voice-{request_id}"
+    if call.name == "request_device_action":
+        arguments["correlation_id"] = f"voice-{request_id}"
+    return LLMToolCall(
+        call_id=call.call_id,
+        name=call.name,
+        arguments=json.dumps(arguments, separators=(",", ":")),
+    )
+
+
+def _physical_action_result_message(
+    call: LLMToolCall, event: dict[str, Any]
+) -> str:
+    """Render lifecycle truth in deterministic code instead of model prose."""
+    payload = _action_result_payload([event])
+    label = "Device action"
+    try:
+        arguments = parse_tool_arguments(call.arguments)
+        if call.name == "request_device_action":
+            action = str(arguments.get("action") or "")
+            parameters = json.loads(str(arguments.get("parameters") or "{}"))
+            channel = parameters.get("channel") if isinstance(parameters, dict) else None
+            if action == "run_pump" and channel is not None:
+                label = f"Pump {channel}"
+            elif action == "stop_pump" and channel is not None:
+                label = f"Pump {channel} stop"
+        elif call.name == "water_plants":
+            label = "Watering"
+        elif call.name == "toggle_fan":
+            label = "Fan"
+    except Exception:
+        pass
+
+    if payload is None:
+        raw = " ".join(str(event.get("raw_result") or "").split())
+        if "physical completion is not confirmed" in raw.lower():
+            return raw
+        return f"{label} could not be confirmed from the action service result."
+    if payload.get("error"):
+        return f"{label} command could not be sent because the action service failed."
+    if payload.get("accepted") is False:
+        reason = " ".join(str(payload.get("reason") or "request rejected").split())
+        return f"{label} command was not sent: {reason}"
+
+    status = str(payload.get("status") or "accepted").strip().lower()
+    if status == "completed":
+        return f"{label} is confirmed complete."
+    if status in {"failed", "timed_out", "cancelled", "rejected"}:
+        reason = " ".join(
+            str(payload.get("reason") or payload.get("error") or status).split()
+        )
+        return f"{label} did not complete: {reason}"
+    return (
+        f"{label} request is {status}; physical activation has not yet been "
+        "confirmed."
+    )
+
+
 def _execute_chat_tool_calls(
     tool_calls: tuple[LLMToolCall, ...],
     mcp_client: Any,
@@ -2870,6 +2944,13 @@ def run_command_stream(
                     yield _speak(limit_note)
                     break
 
+                effective_tool_calls = tuple(
+                    _bind_physical_action_idempotency(
+                        call, request_id=telemetry_id
+                    )
+                    for call in effective_tool_calls
+                )
+
                 messages.append(
                     tool_calls_to_assistant_message("".join(spoken_parts), effective_tool_calls)
                 )
@@ -2909,6 +2990,17 @@ def run_command_stream(
                 tool_history.extend([tool_calls_to_assistant_message("", effective_tool_calls), *tool_messages])
                 messages.extend(tool_messages)
                 rounds += 1
+                if action_results:
+                    action_call, action_event = next(
+                        (call, event)
+                        for call, event in zip(effective_tool_calls, _events)
+                        if call.name in PHYSICAL_ACTION_TOOL_NAMES
+                    )
+                    result_note = _physical_action_result_message(
+                        action_call, action_event
+                    )
+                    yield _speak(result_note)
+                    break
 
         finally:
             response_text = "".join(full_text_parts).replace("Monkey Butler:", "").strip()

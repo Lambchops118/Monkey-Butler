@@ -150,3 +150,7 @@ Remaining open items:
 OQ-G was resolved on 2026-07-26 after correcting the Pico's Wi-Fi SSID. Awareness received canonical state, health, and recurring heartbeat events from `quad_pump_canonical`; reported Wi-Fi/MQTT state was connected, RSSI was -47, and the firmware reported no last error. No relay command had reached the board at that point (`commands_accepted=0`).
 
 No direct contradiction was found in the source. One wording tension is deliberate: PostgreSQL/TimescaleDB/pgvector and the listed Python stack are strong defaults, while existing suitable repository technology takes precedence. Phase 0 must explicitly decide whether the defaults apply; it must not treat either side as an unconditional mandate.
+
+## Snapshot coverage follow-up (2026-11-18)
+
+The observed snapshot investigation in [PER_TURN_AWARENESS_2026-11-18.md](PER_TURN_AWARENESS_2026-11-18.md) leaves two repository/deployment questions: why the local Docker Desktop Linux engine/database is unavailable, and what representative device/property coverage should be guaranteed within the automatic snapshot budget. Current selection prioritizes historical announcements over device facts and has no per-turn entity targeting. No policy decision or runtime repair was made in this investigation.

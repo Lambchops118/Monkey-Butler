@@ -1734,3 +1734,343 @@ the relevant action and audio paths.
 
 Explicit stop point: Requirements documented; no runtime work started.
 >>>>>>> 1ef7b7c0f3f810da998e5b778ff6d855dffcaaa8
+
+## 2026-11-14 — Pump liveness and action-truthfulness repair
+
+Session goal: Correct inaccurate pump online/offline determination and prevent
+unconfirmed watering requests from being reported as active.
+
+Current phase: Bounded Phase 7 action/health repair authorized by the owner.
+
+Bounded task completed: Firmware now creates a unique retained offline will for
+each MQTT session and overwrites it with retained online health after connect.
+Awareness no longer treats retained replay or last-will delivery as live device
+traffic; last-wills transition source/state offline immediately and live traffic
+alone recovers health. The pump deadline is 120 seconds. `run_pump` checks the
+canonical source at request and dispatch; `stop_pump` remains available.
+Runtime-bound mutation identity prevents cross-turn idempotency collisions, and
+physical-action speech is derived from structured lifecycle status.
+
+Files added: None.
+
+Files modified: Pump firmware `main.py`, `qp_net.py`, and `plan.md`; awareness
+ingestion/freshness/registry/action files and README; agent runtime and awareness
+provider; five focused test modules; `IMPLEMENTATION_STATUS.md`, `DECISIONS.md`,
+and this log.
+
+Migrations added: None. Conditional registry bootstrap migration changes an
+existing canonical pump `offline_after_seconds` only when it is still unset.
+
+Decisions made: ADR-056 (live-only liveness plus retained health symmetry) and
+ADR-057 (fail-closed pump starts plus lifecycle-derived action speech).
+
+Assumptions confirmed or changed: MQTT non-retained publishes do not clear
+retained values. Broker/event inspection confirmed the November 13 offline row
+was retained replay, while a direct broker observation still found no live pump
+traffic. Retained evidence is therefore not a connection timestamp.
+
+Tests run: `.venv-main` unittest over firmware, streaming runtime, legacy action
+wrapper, history grounding, argument parsing, and leaked-tool recovery; 120
+passed. `.venv-awareness` unittest over action/ingestion/state unit suites plus
+action/state/presence integration against scratch Postgres; 87 passed. Python
+compile checks and root/submodule `git diff --check` ran.
+
+Tests passed: 207 total, zero failures/errors/skips in the reported runs.
+
+Tests failed: None.
+
+Commands not run: Full repository suite, broker-backed ingestion integration,
+live local-model acceptance, firmware flashing, production service restart,
+physical relay/pump command, and production database mutation.
+
+Known limitations: Firmware health publication was host-tested at the network
+contract/helper level, not on the Pico. Current pump hardware remains offline or
+unable to publish, and fuse sensing remains unavailable. The pre-existing
+session-log conflict marker above was not altered as unrelated repository state.
+
+Security implications: Energizing fails closed on non-healthy canonical-source
+state; model-provided mutation identity is overwritten by runtime identity. No
+new listener, arbitrary MQTT path, cloud dependency, or secret handling was
+introduced.
+
+Deployment implications: Copy the changed firmware files to the pump Pico and
+reboot it; no broker firmware is involved. Restart awareness so bootstrap applies
+the 120-second source deadline, then restart the main agent. The first successful
+controller connection overwrites the stale retained offline message. Verify
+retained online health, multiple live heartbeats, one acknowledged bounded run,
+and a disconnect/reconnect cycle before acceptance.
+
+Unresolved questions: None within the approved repair. Physical acceptance is
+pending owner deployment.
+
+Current repository state: Root tracked changes are the bounded repair listed
+above. The pump submodule has targeted diffs in `Firmware/main.py`, `qp_net.py`,
+and `plan.md`; its pre-task status could not be captured because the parent
+worktree's initial recursive status was denied access to submodule metadata.
+
+Next permitted task: Owner-directed deployment/physical acceptance or a separate
+bounded repair; do not start another phase automatically.
+
+Required reading for next session: This entry, ADR-056/057, Phase 7 actions,
+architectural invariants, tool implementation guide, pump firmware plan, and
+current implementation status.
+
+Explicit stop point: Implementation and simulated/database validation complete;
+no deployment or physical action performed.
+
+## 2026-11-14 — Pump Pico firmware deployment
+
+Session goal: Deploy the approved pump liveness firmware repair to the Pico
+connected to this PC and verify that it reports truthfully after reboot.
+
+Current phase: Bounded Phase 7 deployment/acceptance follow-up authorized by the
+owner; no new implementation phase started.
+
+Bounded task completed: Installed the official MicroPython `mpremote` utility in
+the project main virtual environment, backed up the Pico's installed `main.py`
+and `qp_net.py`, staged and checksum-verified the repaired files, retained unique
+on-device copies of the prior versions, activated the repaired files, and
+rebooted the Pico on COM3. Read-only MQTT observation confirmed a live online
+health event, retained online health, a subsequent heartbeat, and all relays off.
+
+Files added: None.
+
+Files modified: `IMPLEMENTATION_STATUS.md` and this log. Device files `main.py`
+and `qp_net.py` were replaced with the already-approved repository versions.
+
+Migrations added: None.
+
+Decisions made: None. Deployment followed ADR-056/057; no pump command was used
+as a connectivity test.
+
+Assumptions confirmed or changed: The attached VID 2E8A/PID 0005 device on COM3
+was a running MicroPython Pico, not a BOOTSEL mass-storage device. Its installed
+`qp_controller.Message` already supported the repaired retained-publication
+field. The broker's initially observed retained last-will was stale; after the
+post-flash reconnect it was replaced by retained `online=true` as designed.
+
+Tests run: On-device SHA-256 for both deployed modules; live MQTT wildcard
+observation excluding retained messages; final retained-health readback.
+
+Tests passed: `main.py` matched
+`0c3816d182934458fa97448bfc9d0bd748b02806756c5fdfac49e169ac37b3c7` and
+`qp_net.py` matched
+`2d5d1ba4ddefc79bbe39ab605cab731833a6438eb0bbddd252bce19ebf2bd9ef`.
+The final boot published `online=true`, `wifi_connected=true`,
+`mqtt_connected=true`, RSSI -30, zero dropped inbound/outbound messages, all
+four relays false, and a heartbeat at about 30 seconds uptime.
+
+Tests failed: None. One pre-verification retained read returned the expected old
+offline last-will before the rebooted controller completed its reconnect; live
+observation then showed the replacement online record.
+
+Commands not run: Physical relay/pump activation, watering command, production
+awareness restart, main-agent restart, disconnect/reconnect fault injection,
+full repository suite, or new local-model acceptance.
+
+Known limitations: Fuse sensing still reports unavailable. Server-side changes
+are present in the worktree but do not take effect in running awareness/main
+processes until those services restart. Physical water delivery remains
+unverified.
+
+Security implications: Existing `qp_secrets.py` and `qp_ledger.json` were not
+read out, replaced, or modified. No command topic was published and no relay was
+energized.
+
+Deployment implications: The Pico firmware portion is complete. Prior device
+files remain on the Pico as `main.py.pre-20261114-125056` and
+`qp_net.py.pre-20261114-125056`; local copies are under
+`C:\Users\aljac\AppData\Local\Temp\Talos-Pico-Backup-20261114-125056`.
+Restart awareness and then the main agent to activate the server-side portion.
+
+Unresolved questions: None within firmware deployment. A supervised bounded
+watering cycle and disconnect/reconnect test remain acceptance work, not
+performed automatically because they affect physical equipment.
+
+Current repository state: The approved bounded repair remains in the dirty
+worktree. This follow-up changed only status/session documentation; installing
+`mpremote` changed the existing `.venv-main` environment, which is not a tracked
+source change.
+
+Next permitted task: Owner-directed service restart and supervised physical
+acceptance, or a separately authorized bounded task.
+
+Required reading for next session: The preceding pump liveness repair entry,
+this deployment entry, ADR-056/057, Phase 7 actions, and current implementation
+status.
+
+Explicit stop point: Pico deployment and non-actuating MQTT verification are
+complete. Do not energize a relay, water plants, or start another phase without
+owner direction.
+
+## 2026-11-14 — Wall-powered pump command diagnosis
+
+Session goal: Determine why pump commands do not go through after installing the
+controller with its pumps and wall power.
+
+Current phase: Read-only Phase 7 deployment diagnosis; no implementation change.
+
+Bounded task completed: Correlated live MQTT, awareness state/health, action
+audit, voice pipeline telemetry, and the controller schematic. The final
+USB-powered controller session emitted its last-will at 12:58:09. No new boot,
+state, online health, or heartbeat arrived after wall installation. Requests at
+13:01:19 and 13:01:46 reached `run_pump` and were rejected before dispatch with
+`controller source 'quad_pump_canonical' is offline`. Awareness MQTT ingestion,
+database, freshness worker, outbox, and broker connection were healthy.
+
+Files added: None.
+
+Files modified: `IMPLEMENTATION_STATUS.md` and this log only.
+
+Migrations added: None.
+
+Decisions made: None.
+
+Assumptions confirmed or changed: COM3 disappearance is expected after moving
+the controller off the PC and is not evidence of failure. The apparent watchdog
+reboots between 12:48 and 12:58 coincide with the serial deployment session.
+The meaningful installed-state evidence is the absence of any new MQTT boot
+after the final unplug. PCB connectivity confirms J1 feeds the AP63205 buck
+input/enable, whose output feeds Pico VSYS pin 39; J2-J5 are pump outputs.
+
+Tests run: Read-only retained-health and live-heartbeat subscriptions; awareness
+`/state/quad_pump`, `/health/components`, `/events`, and `/actions` queries;
+pipeline telemetry inspection; PCB net inspection.
+
+Tests passed: Server-side components reported healthy. Both recent requests have
+durable rejected records and were never dispatched. The last controller record
+is an explicit last-will rather than a stale online inference.
+
+Tests failed: No wall-powered controller boot or heartbeat was observed during
+the initial window. After
+the owner unplugged and replugged the green-LED power brick, a fresh retained
+health read still returned the old offline last-will, the awareness event query
+contained no new controller events, and a 45-second live wildcard subscription
+received no boot, state, health, or heartbeat traffic. This was transient: a
+later observation found a fresh power-on boot at about 13:23, online health at
+4.1 seconds uptime, and continuing heartbeats.
+
+Commands not run: MQTT command publication, relay/pump activation, firmware
+change, service restart, broker mutation, or physical power measurement.
+
+Known limitations: Remote evidence cannot distinguish no Pico power from a Pico
+that is powered but unable to associate with Wi-Fi. A physical power-path check
+or isolated USB-wall-power test is required to split those cases.
+
+Owner clarification: The wall adapter is connected directly to the Pico USB
+port, not J1. This rules out the board's J1/buck/VSYS path as the active supply
+path, but remote evidence still cannot distinguish unreliable USB power or a
+boot fault from failed Wi-Fi association. Serial boot inspection is the next
+non-actuating diagnostic; firmware reflash is not presently indicated.
+
+Recovery evidence: The Pico answered at its previously recorded DHCP address
+`192.168.1.166` with 30/30 ICMP replies, then published a new boot's state and
+retained `online=true` health. Health reported RSSI -40, Wi-Fi and MQTT
+connected, one successful connection, zero consecutive failures/radio resets,
+and no dropped messages. Six heartbeats arrived at 30-second intervals through
+180 seconds uptime. Awareness classified health and all four false relay states
+as current. No firmware change or physical command was used.
+
+Subsequent failure evidence: Heartbeats continued only through 270 seconds
+uptime. None of the heartbeat, health report, or state snapshot due at 300
+seconds arrived. Mosquitto emitted the unique last-will at 13:28:57, 90 seconds
+after the final heartbeat, and `192.168.1.166` then had 100% packet loss. A
+13:31 `run_pump` request was correctly rejected before dispatch. A host harness
+advanced the same main loop through 301 seconds and successfully encoded and
+published the three due messages, so the pure scheduling path did not reproduce
+the fault. Passive serial capture across the boundary is required to distinguish
+a Pico-only exception/MemoryError, watchdog stall, or USB-power instability.
+
+Controlled power-source comparison: With the owner moving the same Pico USB
+connection to this PC, COM3 was opened passively at 115200 baud with DTR/RTS
+disabled; no input, REPL control, reset, flash, or command was sent. The board
+connected at RSSI -41/-38 and published uninterrupted 30-second heartbeats
+through 450 seconds uptime. At 300 seconds it successfully published the
+previously missing health, state, and heartbeat batch; retained health remained
+online with zero failures, radio resets, or dropped messages. The serial stream
+contained no traceback or reboot output, awareness remained current, and all
+relays remained false. This controlled run rules out the firmware's five-minute
+schedule and Wi-Fi/MQTT route. The wall USB source is the remaining changed
+variable and its near-exact five-minute loss is consistent with low-current
+auto-shutoff or unstable USB output despite a lit brick indicator. No reflash is
+indicated; replace/configure the USB source for continuous output and repeat a
+non-actuating soak before physical acceptance.
+
+12 V/J1 confirmation: With all pumps detached, the owner powered the controller
+through its 12 V input. A read-only MQTT soak observed a fresh boot, online
+health in about four seconds, RSSI improving from -44 to -36, zero failures,
+radio resets, or dropped messages, and every 30-second heartbeat through 480
+seconds uptime. The health/state/heartbeat batch at 300 seconds completed
+normally, 10/10 initial ICMP checks succeeded, awareness remained current, and
+all four relays stayed false. No serial access, firmware change, or action
+publication occurred. Together with the PC USB control, this confirms the
+previous USB wall source—not firmware, Wi-Fi, MQTT, or the board regulator—as
+the failed boundary. Pump-load and relay behavior remain untested.
+
+Security implications: None; all inspection was read-only and no physical action
+was dispatched.
+
+Deployment implications: Verify that the supply is connected to J1 and that the
+Pico receives VSYS power. If power is present, diagnose Wi-Fi association at the
+installed location. Do not bypass the offline interlock.
+
+Unresolved questions: Whether J1/Pico VSYS has power at the installed location;
+if it does, whether the installed location can join the configured Wi-Fi.
+
+Current repository state: Existing bounded repair changes remain; this diagnosis
+changed documentation only.
+
+Next permitted task: Owner-assisted power/Wi-Fi isolation at the installed
+controller, followed by non-actuating MQTT verification.
+
+Required reading for next session: This entry, the preceding deployment entry,
+ADR-056/057, and the controller PCB power nets.
+
+Explicit stop point: Software-side diagnosis is complete. Do not publish a pump
+command until the controller is live and the owner authorizes physical testing.
+
+## 2026-11-18 — Per-turn model awareness investigation
+
+Session goal: Determine default model context and whether light state can be read.
+Current phase: Bounded source investigation; no phase implementation.
+Bounded task completed: Traced prompt assembly, snapshot selection/fallback, awareness read tools, and smart-switch provider/service.
+Files added: PER_TURN_AWARENESS_2026-11-18.md in this directory.
+Files modified: IMPLEMENTATION_STATUS.md; SESSION_LOG.md.
+Migrations added: None.
+Decisions made: None; no new architecture decision.
+Assumptions confirmed or changed: Automatic household context is bounded database context, not a fresh poll of every device; configured light IDs do not imply current power knowledge.
+Tests run: None (documentation/source investigation only).
+Tests passed: None run.
+Tests failed: None run.
+Commands not run: Runtime suites, live model requests, device queries/actions, deployment checks.
+Known limitations: Running process version and external light-state producers were not verified. Root git status required --ignore-submodules because the pump submodule metadata was inaccessible.
+Security implications: No device actions or secret output.
+Deployment implications: None.
+Unresolved questions: No owner decision needed for this investigation; live deployment coverage remains unverified.
+Current repository state: Pre-existing runtime/config/test/documentation modifications preserved; this task adds documentation only.
+Next permitted task: Owner-assigned bounded follow-up; no automatic implementation.
+Required reading for next session: Investigation report, implementation status, architectural invariants; tool guide if tools change.
+Explicit stop point: Investigation complete; no light-state/toggle implementation or later-phase work.
+
+## 2026-11-18 — Observed household snapshot effectiveness
+
+Session goal: Verify whether compact household context ever reached the model and what it supplied.
+Current phase: Bounded investigation, documentation only.
+Bounded task completed: Compared five recent saved input files, live awareness read endpoints, Docker status, selection logic and prior repair records.
+Files added: None.
+Files modified: PER_TURN_AWARENESS_2026-11-18.md, IMPLEMENTATION_STATUS.md, OPEN_QUESTIONS.md, SESSION_LOG.md (this directory).
+Migrations added: None.
+Decisions made: None; diagnosis/recommendations only.
+Assumptions confirmed or changed: Actual injection is proven, but useful device coverage is poor; current missing context coincides with database outage. Automatic snapshot failure can omit context without a model-visible degradation notice.
+Tests run: Four context-selection cases in awareness venv; eight client/provider cases in runtime venv with loopback allowed.
+Tests passed: 12. Documentation diff whitespace check also passed.
+Tests failed: Initial module-style invocation produced two import errors; corrected discovery runs passed. Runtime context discovery skipped for missing dependencies; awareness rerun passed. Sandboxed client/provider run stalled and was interrupted before successful socket-enabled rerun.
+Commands not run: Database integration suites, live model inference, physical actions, service restart/deployment.
+Known limitations: Five-file sample includes inference rounds, not distinct turns; historical announcement text shares are approximate character ratios. No database access meant absent selected properties could not be compared to all stored properties. Docker outage root cause remains unknown.
+Security implications: Read-only service/log inspection; no secret output or actuation.
+Deployment implications: Awareness reads currently report database unreachable; Docker's configured engine named pipe is absent. No service state changed.
+Unresolved questions: Recorded in OPEN_QUESTIONS.md; database availability and guaranteed state coverage.
+Current repository state: Existing unrelated modifications preserved; investigation changed documentation only.
+Next permitted task: Separately assigned bounded diagnosis/repair, no automatic later-phase work.
+Required reading for next session: Investigation report, implementation status, architectural invariants; tool guide if tools change.
+Explicit stop point: Investigation complete; no restoration, snapshot-selection repair, or light-tool implementation begun.

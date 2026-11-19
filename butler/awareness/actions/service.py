@@ -31,7 +31,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from butler.awareness.actions.registry import ActionDefinition, ActionRegistry
 from butler.awareness.config import AwarenessSettings
-from butler.awareness.db.models import ActionRequest, ActionTransition, CurrentState, OutboxItem
+from butler.awareness.db.models import (
+    ActionRequest,
+    ActionTransition,
+    CurrentState,
+    OutboxItem,
+    Source,
+)
 from butler.awareness.logging_utils import get_logger
 
 logger = get_logger("butler.awareness.actions")
@@ -173,7 +179,8 @@ class ActionService:
                     now=now,
                 )
             state_error = await self._check_allowed_state(connection, definition, validated)
-            if state_error:
+            source_error = await self._check_source_health(connection, definition)
+            if state_error or source_error:
                 return await self._persist_rejected(
                     connection,
                     action_name=definition.name,
@@ -183,7 +190,7 @@ class ActionService:
                     actor=actor,
                     correlation_id=correlation_id,
                     idempotency_key=durable_key,
-                    reason=state_error,
+                    reason=state_error or source_error or "safety validation failed",
                     now=now,
                 )
             cooldown_error = await self._check_cooldown(
@@ -298,6 +305,7 @@ class ActionService:
             state_error = await self._check_allowed_state(
                 connection, definition, dict(row.parameters)
             )
+            source_error = await self._check_source_health(connection, definition)
             cooldown_error = await self._check_cooldown(
                 connection,
                 definition,
@@ -305,8 +313,13 @@ class ActionService:
                 parameters=dict(row.parameters),
                 exclude_request_id=action_request_id,
             )
-            if state_error or cooldown_error:
-                reason = state_error or cooldown_error or "validation failed"
+            if state_error or source_error or cooldown_error:
+                reason = (
+                    state_error
+                    or source_error
+                    or cooldown_error
+                    or "validation failed"
+                )
                 await self._transition(
                     connection,
                     action_request_id,
@@ -605,6 +618,18 @@ class ActionService:
                         detail="action no longer registered", now=datetime.now(timezone.utc),
                     )
                     return
+                source_error = await self._check_source_health(connection, definition)
+                if source_error:
+                    await self._transition(
+                        connection,
+                        request_id,
+                        row.status,
+                        "failed",
+                        detail=f"dispatch-time safety check failed: {source_error}",
+                        now=datetime.now(timezone.utc),
+                        extra={"error": source_error[:500]},
+                    )
+                    return
                 topic = definition.render_topic(row.parameters)
                 if definition.payload == "envelope":
                     body = json.dumps(
@@ -802,6 +827,25 @@ class ActionService:
                 f"safety check failed: target state {property_name}={current!r} "
                 f"is not in the allowed "
                 f"prior states {definition.allowed_prior_values}"
+            )
+        return None
+
+    async def _check_source_health(
+        self, connection: AsyncConnection, definition: ActionDefinition
+    ) -> str | None:
+        if "source_healthy" not in definition.safety_checks:
+            return None
+        status = (
+            await connection.execute(
+                sa.select(Source.health_status).where(
+                    Source.source_id == definition.ack_source_id
+                )
+            )
+        ).scalar_one_or_none()
+        if status != "healthy":
+            return (
+                f"safety check failed: controller source "
+                f"{definition.ack_source_id!r} is {status or 'unknown'}"
             )
         return None
 

@@ -146,6 +146,30 @@ class ActionsIntegrationTest(unittest.TestCase):
                 },
             )
 
+            # Energizing fails closed until live canonical-controller evidence
+            # has made the source healthy.
+            unavailable = await service.request(
+                action_name="run_pump", parameters={"channel": 1}, actor="llm"
+            )
+            self.assertFalse(unavailable["accepted"])
+            self.assertIn("quad_pump_canonical", unavailable["reason"])
+            self.assertIn("unknown", unavailable["reason"])
+
+            heartbeat = await pipeline.handle(
+                InboundMessage(
+                    topic="home/irrigation/quad_pump/heartbeat",
+                    payload=json.dumps(
+                        {
+                            "event_id": str(uuid.uuid4()),
+                            "boot_id": "boot-test",
+                            "sequence": 1,
+                            "payload": {"uptime_ms": 1000},
+                        }
+                    ).encode(),
+                )
+            )
+            self.assertEqual(heartbeat, "accepted")
+
             # --- schema bounds are enforced before anything is dispatched ----
             for parameters, expected in (
                 ({"channel": 0}, "must be one of"),
@@ -311,6 +335,7 @@ class ActionsIntegrationTest(unittest.TestCase):
                         {
                             "boot_id": "boot-test",
                             "payload": {
+                                "online": True,
                                 "firmware_version": "quad_pump-2.0.0",
                                 "mqtt_connected": True,
                                 "fuse_sensing": "unavailable",
@@ -320,6 +345,40 @@ class ActionsIntegrationTest(unittest.TestCase):
                 )
             )
             self.assertEqual(health, "accepted")
+
+            # Availability is checked again at dispatch so a last-will that
+            # arrives after approval still prevents relay energization.
+            pending = await service.request(
+                action_name="run_pump", parameters={"channel": 4}, actor="llm"
+            )
+            self.assertTrue(pending["accepted"])
+            published_before = len(published)
+            last_will = await pipeline.handle(
+                InboundMessage(
+                    topic="home/irrigation/quad_pump/health",
+                    payload=json.dumps(
+                        {
+                            "event_id": str(uuid.uuid4()),
+                            "boot_id": "boot-test",
+                            "payload": {"online": False, "reason": "last_will"},
+                        }
+                    ).encode(),
+                )
+            )
+            self.assertEqual(last_will, "accepted")
+            self.assertEqual(await worker.run_once(), 1)
+            self.assertEqual(len(published), published_before)
+            detail = await service.get(uuid.UUID(pending["action_request_id"]))
+            self.assertEqual(detail["status"], "failed")
+            self.assertIn("is offline", detail["error"])
+
+            # Stopping remains dispatchable while source health is unavailable.
+            offline_stop = await service.request(
+                action_name="stop_pump", parameters={"channel": 4}, actor="llm"
+            )
+            self.assertTrue(offline_stop["accepted"])
+            self.assertEqual(await worker.run_once(), 1)
+            self.assertEqual(json.loads(published[-1][1])["action"], "stop_pump")
             self.assertEqual(pipeline.metrics.dead_lettered, {})
         finally:
             await engine.dispose()

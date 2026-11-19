@@ -2,6 +2,67 @@
 
 This file reports implementation state, not documentation availability.
 
+## Current bounded repair — pump liveness and action truthfulness (2026-11-14)
+
+The canonical pump health contract now uses a unique retained offline will per
+MQTT session and retained `online=true` recovery, while awareness treats
+retained replay as evidence rather than liveness. Explicit last-wills mark the
+source/state offline immediately; live traffic alone recovers it; the pump
+offline deadline is 120 seconds. `run_pump` fails closed unless the canonical
+source is healthy at request and dispatch, while `stop_pump` remains available.
+Voice mutation identity is runtime-bound and lifecycle wording no longer lets
+model prose turn approval into claimed activation. No migration was required.
+
+Validation: 120 main-runtime/firmware tests and 87 awareness unit/integration
+tests passed (207 total); all touched Python modules compile and root/submodule
+diff checks pass. Scratch Postgres exercised clean migrations, retained/live
+health transitions, request/dispatch races, and action audit. On 2026-11-14 the
+changed `main.py` and `qp_net.py` were deployed to the Pico on COM3, verified by
+on-device SHA-256, and rebooted. Live MQTT evidence showed retained
+`online=true`, Wi-Fi/MQTT connected, RSSI -30, all four relays off, and a
+subsequent heartbeat. No physical pump or watering command ran. Awareness and
+the main agent still require restart before the server-side repair is active;
+one bounded acknowledged watering cycle remains a supervised acceptance check.
+
+Follow-up after moving the controller to wall power: its final USB-powered
+session ended with a last-will at 12:58:09 and no new boot/state/health/heartbeat
+has appeared. Two later `run_pump` requests were correctly rejected before
+dispatch because `quad_pump_canonical` was offline. Awareness, database, broker
+ingestion, and action auditing are healthy. The remaining boundary is controller
+power or Wi-Fi association at its installed location; schematic inspection
+confirms J1 is the board input feeding U1 and Pico VSYS, while J2-J5 are outputs.
+An owner-performed wall-power cycle with the brick LED green produced no MQTT
+traffic or new boot ID during a 45-second live observation. The owner then
+clarified that wall power goes directly to the Pico USB connector, ruling out
+the PCB J1/U1 power path for this setup. The remaining boundary is USB power or
+Wi-Fi association/boot at the installed location; reflashing is not indicated.
+The controller subsequently booted at about 13:23, associated in about four
+seconds at RSSI -40, resumed retained online health and 30-second heartbeats,
+and was classified current by awareness. Thirty ICMP checks to its prior DHCP
+address had zero loss. Wi-Fi and MQTT were healthy during that boot; all relays
+were off.
+That recovery did not persist: heartbeats stopped after 270 seconds uptime, the
+300-second heartbeat/health/state batch never arrived, and Mosquitto emitted the
+last-will at 13:28:57. The Pico then stopped answering its prior IP. Awareness
+correctly returned the source to offline and rejected a 13:31 `run_pump` request.
+A host-clock reproduction crossed the 300-second reporting boundary and emitted
+all three messages normally, so the remaining fault is Pico-only and requires a
+passive serial traceback/watchdog capture; no speculative reflash has been made.
+A subsequent passive COM3 capture under PC USB power ran through 450 seconds
+without serial output, reset, packet loss, or missed heartbeat. The 300-second
+health/state/heartbeat batch completed normally and awareness stayed current.
+Because the same Pico, cable, firmware, Wi-Fi, and broker survive beyond the
+wall failure while only the power source changes, the wall USB source is the
+fault boundary—most likely a five-minute low-current cutoff or unstable output.
+No firmware flash is needed.
+An additional no-pump soak powered through the controller's 12 V J1 path stayed
+online through 480 seconds, crossed the 300-second report batch, delivered every
+heartbeat, and remained current in awareness with all relays false. This
+confirms the board regulator path is stable and isolates the failure to the
+prior USB wall-power setup. Pump-load behavior remains untested.
+
+Stop at this repair. Do not begin unrelated Phase 7 or later-phase work.
+
 ## Current consultation — wake-only voice interaction requirements (2026-11-10)
 
 The owner requested a behavior-only specification at
@@ -425,3 +486,11 @@ remaining sub-phases and resolved OQ-M. No further sub-phase pause was taken.
 | Documentation follow-up (2026-07-16) | Added `like_im_a_child_or_golden_retriever.md`, a plain-language intern quick start covering immediate operation, Butler integration, maintenance, code paths, tests, safety invariants, limitations, and troubleshooting. Linked it from this documentation index. Validation: 96 awareness unit tests and 3 main-agent home-action tests pass; CLI help, relative-link targets, and `git diff --check` pass. Runtime, schemas, migrations, decisions, and open questions are unchanged. |
 
 Do not infer implementation progress from the presence of specification or launcher files. Session handoffs live in dated files derived from `SESSION_HANDOFF_TEMPLATE.md` (latest: `SESSION_LOG.md` (2026-09-06 HUMAN CONTEXT entry)).
+
+## Current consultation — per-turn model awareness (2026-11-18)
+
+Source investigation completed in [PER_TURN_AWARENESS_2026-11-18.md](PER_TURN_AWARENESS_2026-11-18.md). The shared engine receives bounded situation/history/memory context and tools. Smart-switch tools expose configuration and explicit on/off control, but no current-power read or toggle operation; no Kasa-state ingestion path was found in inspected awareness code. No runtime changes, tests, live model/device queries, or deployment. Stop at investigation pending a separately bounded implementation request.
+
+## Follow-up consultation — observed snapshot effectiveness (2026-11-18)
+
+Expanded [PER_TURN_AWARENESS_2026-11-18.md](PER_TURN_AWARENESS_2026-11-18.md) with live read-only probes and five saved model-input files. Injection is proven in 111/126 sampled model requests, but historical announcements occupied approximately 65–73% of older snapshot text and selected device facts were limited to stale legacy pump/fuse fields. Today's 12 sampled requests had no snapshot; live capabilities report database unreachable and the configured Docker engine is unavailable. Four selection tests and eight client/provider tests passed in their appropriate environments. No runtime repair/restart/action; stop at diagnosis.

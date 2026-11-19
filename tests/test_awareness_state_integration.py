@@ -298,8 +298,104 @@ class StateTelemetryIntegrationTest(unittest.TestCase):
             self.assertEqual(
                 max(point["max"] for point in aggregate["points"]), max(values)
             )
+
+            await self._pump_health_scenario(engine, sources)
         finally:
             await engine.dispose()
+
+    async def _pump_health_scenario(self, engine, sources) -> None:
+        """Retained replay is evidence, but only live traffic proves liveness."""
+        import sqlalchemy as sa
+
+        from butler.awareness.ingestion.pipeline import InboundMessage, IngestionPipeline
+
+        pipeline = IngestionPipeline(engine, sources, self.settings)
+
+        async def source_row():
+            async with engine.connect() as connection:
+                return (
+                    await connection.execute(
+                        sa.text(
+                            "SELECT health_status, last_received_at, "
+                            "offline_after_seconds FROM sources "
+                            "WHERE source_id = 'quad_pump_canonical'"
+                        )
+                    )
+                ).one()
+
+        retained_offline = await pipeline.handle(
+            InboundMessage(
+                topic="home/irrigation/quad_pump/health",
+                retained=True,
+                payload=json.dumps(
+                    {
+                        "event_id": str(uuid.uuid4()),
+                        "boot_id": "pump-boot",
+                        "payload": {"online": False, "reason": "last_will"},
+                    }
+                ).encode(),
+            )
+        )
+        self.assertEqual(retained_offline, "accepted")
+        row = await source_row()
+        self.assertEqual(row.health_status, "offline")
+        self.assertIsNone(row.last_received_at)
+        self.assertEqual(row.offline_after_seconds, 120.0)
+
+        # A retained online snapshot is still replay, not current liveness.
+        retained_online = await pipeline.handle(
+            InboundMessage(
+                topic="home/irrigation/quad_pump/health",
+                retained=True,
+                payload=json.dumps(
+                    {
+                        "event_id": str(uuid.uuid4()),
+                        "boot_id": "pump-boot",
+                        "payload": {"online": True, "mqtt_connected": True},
+                    }
+                ).encode(),
+            )
+        )
+        self.assertEqual(retained_online, "accepted")
+        row = await source_row()
+        self.assertEqual(row.health_status, "offline")
+        self.assertIsNone(row.last_received_at)
+
+        live_heartbeat = await pipeline.handle(
+            InboundMessage(
+                topic="home/irrigation/quad_pump/heartbeat",
+                payload=json.dumps(
+                    {
+                        "event_id": str(uuid.uuid4()),
+                        "boot_id": "pump-boot",
+                        "sequence": 1,
+                        "payload": {"uptime_ms": 30000},
+                    }
+                ).encode(),
+            )
+        )
+        self.assertEqual(live_heartbeat, "accepted")
+        row = await source_row()
+        self.assertEqual(row.health_status, "healthy")
+        live_received_at = row.last_received_at
+        self.assertIsNotNone(live_received_at)
+
+        live_last_will = await pipeline.handle(
+            InboundMessage(
+                topic="home/irrigation/quad_pump/health",
+                payload=json.dumps(
+                    {
+                        "event_id": str(uuid.uuid4()),
+                        "boot_id": "pump-boot",
+                        "payload": {"online": False, "reason": "last_will"},
+                    }
+                ).encode(),
+            )
+        )
+        self.assertEqual(live_last_will, "accepted")
+        row = await source_row()
+        self.assertEqual(row.health_status, "offline")
+        self.assertEqual(row.last_received_at, live_received_at)
 
     async def _conflict_scenario(self, engine, sources) -> None:
         """Equal comparison time + different value marks the row conflicting."""

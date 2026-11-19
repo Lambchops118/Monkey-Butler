@@ -70,7 +70,7 @@ class ActionDefinition(_Strict):
     allowed_actors: list[str] = Field(min_length=1)
     confirmation_required: bool = False
     confirmation_ttl_seconds: float = Field(default=120.0, gt=0)
-    safety_checks: list[Literal["allowed_state"]]
+    safety_checks: list[Literal["allowed_state", "source_healthy"]]
     cooldown_seconds: float = Field(default=0.0, ge=0)
     # "action" (default) rate-limits the action as a whole — the legacy
     # behavior. "parameter" scopes the cooldown to one validated parameter

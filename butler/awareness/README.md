@@ -136,11 +136,13 @@ type-specific fields — see `schemas/events.py` and `ingestion/normalization.py
 - Sequence evaluation classifies duplicates, out-of-order late arrivals
   (stored, flagged in `provenance.metadata.arrival`, never advancing the
   counter), sequence gaps, and boot resets.
-- Retained messages are marked `provenance.retained` and freshness is judged
-  by `received_at` — a retained value is evidence, not current state.
-- The Pico firmware publishes QoS 0 with no acks, no NTP, no reconnect; no
-  buffering or delivery guarantee is claimed for those devices (their events
-  carry `clock_quality="server_received"`).
+- Retained messages are marked `provenance.retained`; they are stored as
+  evidence but do not refresh `last_received_at`, advance source sequence, or
+  recover source health. A retained last-will may still make a source offline.
+- Legacy Pico firmware has no NTP and weak delivery semantics. The canonical
+  plant-waterer uses QoS 1, bounded buffering, acknowledgements, and reconnect;
+  its events still carry `clock_quality="server_received"` because it has no
+  synchronized wall clock.
 - Rejections (`unauthorized_topic`, `source_disabled`, `oversized`,
   `malformed_payload`, `source_mismatch`, `unsupported_topic`,
   `internal_error`) land in `dead_letter_events` with the bounded raw payload;
@@ -206,9 +208,11 @@ deadlines (`stale_after_seconds`/`offline_after_seconds`) or the configured
 defaults, anchored on server receipt time — untrusted device clocks never
 extend freshness. Every change is recorded once (`state_transitions`,
 `source_health_history`); re-runs and restarts are idempotent. Sources that
-never reported stay `unknown`. A first accepted message flips the source back
-to `healthy` and the state to `current` (`recovered`), both with history. The
-alert hook is a Phase 4 interface and currently does nothing. Reads qualify
+never reported stay `unknown`. Only a live non-last-will message recovers the
+source to `healthy`; retained replay never proves liveness. An explicit
+last-will marks the source and its state offline immediately. The canonical
+plant-waterer uses a 120 s offline deadline (four missed 30 s heartbeats)
+instead of the generic 15-minute default. Reads qualify
 overdue rows as `stale` even before the worker's next pass, and every read
 carries `as_of`, age, source, and confidence.
 
@@ -457,6 +461,11 @@ stopping must never be rate-limited. Cooldown is a backend rate limit, not an
 interlock — the firmware's one-pump-at-a-time rule and 30 s hard deadline are
 the real safety bounds (INV-09).
 
+`run_pump` additionally requires `quad_pump_canonical` to be `healthy` both
+when requested and immediately before outbox dispatch. Offline, stale, or
+unknown health fails closed without publishing. `stop_pump` remains available
+because a safety-oriented stop must not be blocked by uncertain reachability.
+
 ### Canonical plant-waterer contract
 
 The rewritten firmware ([`Peripherals/Pump-Power-Controller/Firmware`](../../Peripherals/Pump-Power-Controller/Firmware))
@@ -467,6 +476,11 @@ source-bound `quad_pump.command_ack` carrying `payload.command_id` and a
 boolean `payload.ok`. A successful ack is emitted only after the relay has been
 driven off. Device state arrives as `relay_1..4` (boolean) and `fuse_1..4`
 (enum string) on the canonical state topic.
+
+Every MQTT session has a unique retained `online=false` last-will. After a
+successful connection the firmware immediately overwrites it with retained
+`online=true` health, then emits live heartbeats every 30 seconds. This prevents
+subscriber reconnects from replaying an obsolete offline value as current.
 
 **Fuse sensing is not implemented on the current board.** The signal is an
 analog divider wired to GP6-GP9, which have no ADC (the Pico W exposes only
@@ -490,8 +504,8 @@ Every request and transition is durable (`action_requests` +
 → acknowledged → completed, with rejected/failed/timed_out/cancelled terminal
 states. Unsupported/schema/permission/safety/cooldown rejections, failed
 confirmation/cancel attempts, duplicate requests, late acks, and state
-mismatches remain queryable audit transitions. A caller-supplied idempotency
-key binds actor/action/normalized parameters/correlation; an exact duplicate
+mismatches remain queryable audit transitions. The agent runtime binds the
+idempotency key and correlation to the current user intent; an exact duplicate
 returns the existing lifecycle, while changed content is rejected. Command
 IDs are database-unique.
 
@@ -508,7 +522,7 @@ request approved until a publish succeeds. Both paths schedule
 are shared with ingestion.
 
 Completion is action-specific and **silence is never success**. The pump
-firmware publishes `status/{pin}=0` only after its fixed eight-second cycle;
+firmware publishes `status/{pin}=0` only after its fixed 30-second legacy cycle;
 that final off evidence completes watering. Fan status is normalized for its
 active-low relay. Mismatching state evidence acknowledges then fails the
 action instead of being called successful. The simulator's source-bound
@@ -523,7 +537,9 @@ API: `POST /actions/request`, `POST /actions/{id}/confirm`,
 the full transition audit. MCP tools: `request_device_action`,
 `get_action_status`. The existing MCP names `water_plants` and `toggle_fan`
 are preserved but now call the action API; their result reports the durable
-request status and never claims physical success before evidence. Physical
+request status and never claims physical success before evidence. Voice action
+responses are rendered from that structured lifecycle result rather than model
+prose: approved/dispatched means awaiting acknowledgement, not running. Physical
 hardware was not exercised (ADR-014): completion/failure semantics are proven
 against the simulator and the repository-confirmed legacy firmware/status
 shape. The canonical plant-waterer firmware (2026-07-26) adds device-side command

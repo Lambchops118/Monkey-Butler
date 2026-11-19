@@ -118,6 +118,10 @@ _SOURCES: list[dict[str, Any]] = [
         # between snapshots. Heartbeats still drive the tighter source-health
         # deadline independently.
         "stale_after_seconds": 420.0,
+        # Four missed 30 s heartbeats. This is longer than ordinary jitter and
+        # close to the firmware's own 90 s broker-inactivity detector, while
+        # avoiding the generic 15-minute blind window for physical actions.
+        "offline_after_seconds": 120.0,
         "allowed_topics": [
             "home/irrigation/quad_pump/state",
             "home/irrigation/quad_pump/event",
@@ -205,6 +209,12 @@ _SOURCE_MIGRATIONS: list[dict[str, Any]] = [
         "column": "stale_after_seconds",
         "expected": None,
         "value": 420.0,
+    },
+    {
+        "source_id": "quad_pump_canonical",
+        "column": "offline_after_seconds",
+        "expected": None,
+        "value": 120.0,
     },
     {
         # Dropping the field from the seed only affects a fresh insert; the

@@ -431,6 +431,75 @@ class RunCommandStreamTests(unittest.TestCase):
             backend.stream_calls[1][-1]["content"],
         )
 
+    def test_model_selected_action_gets_runtime_identity_and_truthful_status(self):
+        mcp = _FakeMCP()
+
+        def accepted_action(name, arguments):
+            mcp.calls.append((name, arguments))
+            return (
+                '{"accepted":true,"action_request_id":"req-monstera",'
+                '"status":"approved"}'
+            )
+
+        mcp.call_tool = mock.Mock(side_effect=accepted_action)
+        backend = _FakeBackend(
+            [
+                [
+                    LLMCompletion(
+                        text="",
+                        tool_calls=(
+                            LLMToolCall(
+                                call_id="water-1",
+                                name="request_device_action",
+                                arguments=(
+                                    '{"action":"run_pump",'
+                                    '"parameters":"{\\"channel\\":1}",'
+                                    '"idempotency_key":"voice-old-turn"}'
+                                ),
+                            ),
+                        ),
+                    )
+                ]
+            ]
+        )
+        tool_defs = [
+            {
+                "name": "request_device_action",
+                "description": "Request a registered physical action.",
+                "parameters": {"type": "object", "properties": {}},
+            }
+        ]
+        patches = self._patches(backend, mcp)
+        patches[1] = mock.patch.object(
+            agent_runtime, "_build_tool_definitions", return_value=tool_defs
+        )
+        for patcher in patches:
+            patcher.start()
+        try:
+            output = list(
+                agent_runtime.run_command_stream(
+                    "water the monstera",
+                    session_id="voice-worker",
+                    interaction_mode="voice",
+                    request_id="fresh-turn",
+                )
+            )
+        finally:
+            for patcher in patches:
+                patcher.stop()
+
+        self.assertEqual(
+            output,
+            [
+                "Pump 1 request is approved; physical activation has not yet "
+                "been confirmed."
+            ],
+        )
+        self.assertEqual(len(backend.stream_calls), 1)
+        arguments = agent_runtime.parse_tool_arguments(mcp.calls[0][1])
+        self.assertEqual(arguments["idempotency_key"], "voice-fresh-turn")
+        self.assertEqual(arguments["correlation_id"], "voice-fresh-turn")
+
     def test_explicit_pump_action_service_error_is_reported_without_llm_claim(self):
         class _FailingMCP(_FakeMCP):
             def call_tool(self, name, arguments):

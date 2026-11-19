@@ -138,6 +138,10 @@ class CanonicalPumpActionTest(unittest.TestCase):
         self.assertEqual(self.run_pump.cooldown_parameter, "channel")
         self.assertGreater(self.run_pump.cooldown_seconds, 0)
 
+    def test_run_requires_a_healthy_canonical_controller(self) -> None:
+        self.assertEqual(self.run_pump.safety_checks, ["source_healthy"])
+        self.assertNotIn("source_healthy", self.stop_pump.safety_checks)
+
     def test_stopping_is_never_rate_limited(self) -> None:
         self.assertEqual(self.stop_pump.cooldown_seconds, 0.0)
         self.assertEqual(self.stop_pump.cooldown_scope, "action")
