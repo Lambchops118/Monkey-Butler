@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+Peripherals/fan/fan_secrets.py
 
 # Local Python environments and caches
 .venv/

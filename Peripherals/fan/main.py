@@ -7,10 +7,9 @@ import time
 import network
 import machine
 from   umqtt.simple import MQTTClient
+from fan_secrets import WIFI_SSID, WIFI_PASSWORD
 
 # Configuration
-WIFI_SSID         = 'Verizon_4VLXXY'
-WIFI_PASSWORD     = 'artery4-fob-vim'
 MQTT_BROKER       = '192.168.1.160'
 MQTT_CLIENT_ID    = 'pico-w-client'
 MQTT_TOPIC_PREFIX = b'fan/'
@@ -32,7 +31,6 @@ def connect_wifi():
         print("wlan not connected...")
         wlan.connect(WIFI_SSID, WIFI_PASSWORD)
         print("WIFI_SSID: " + WIFI_SSID)
-        print("WIFI_PASSWORD: " + WIFI_PASSWORD)
         while not wlan.isconnected():
             print("Sleeping...")
             time.sleep(0.5)
