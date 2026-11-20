@@ -43,26 +43,26 @@ BUTLER is an entirely locally hosted, real-time, voice interaction based artific
 - Exposes diagnostic data through a web based dashboard.
 
 ## ===External Hardware Subsystems (IoT Nodes)===
-<u>**Houseplant Watering System:**</u> In-house designed and JLCPCB-fabcricated relay control board. Draws power from 12V laptop charger, connects via embedded raspiberry pi pico to MQTT broker. Activates pumps via relay to water a Monstera, Trailing Red, and Philodendron. Water drains from pots back into basin.
+<ins>**Houseplant Watering System:**</ins> In-house designed and JLCPCB-fabcricated relay control board. Draws power from 12V laptop charger, connects via embedded raspiberry pi pico to MQTT broker. Activates pumps via relay to water a Monstera, Trailing Red, and Philodendron. Water drains from pots back into basin.
 
-<u>**Houseplant Soil Monitoring System:**</u> (Designed, but not fabricated) In-house designed soil moisture sensor. Operates of extremely low power from onboard solar panel. Remains in dormant state for most of operational time, then sends data package to mqtt broker.
+<ins>**Houseplant Soil Monitoring System:**</ins> (Designed, but not fabricated) In-house designed soil moisture sensor. Operates of extremely low power from onboard solar panel. Remains in dormant state for most of operational time, then sends data package to mqtt broker.
 
-<u>**Room Temperature and Humidity Hysteresis System:**</u> In-House designed room temperature and humidity system that aims to keep the studio apartment at a comfortable temperature and humidity year round. When humidity drops below 40%, it sends a ping to BUTLER to activate the humidifier. When humidity is above 50% it sends a ping to turn it off. Similar for temperature.
+<ins>**Room Temperature and Humidity Hysteresis System:**</ins> In-House designed room temperature and humidity system that aims to keep the studio apartment at a comfortable temperature and humidity year round. When humidity drops below 40%, it sends a ping to BUTLER to activate the humidifier. When humidity is above 50% it sends a ping to turn it off. Similar for temperature.
 
-<u>**Smart Lights, Fan, Coffee Pot:**</u> All lights in the house have been rewired with Tapo/Kasa smart switches. The fan and coffee pot operate off of Kasa smart plugs. BUTLER can freely interact with these.
+<ins>**Smart Lights, Fan, Coffee Pot:**</ins> All lights in the house have been rewired with Tapo/Kasa smart switches. The fan and coffee pot operate off of Kasa smart plugs. BUTLER can freely interact with these.
 
-<u>**Jeep CAN Bus Interface:**</u> (Early Development) Onboard telemetry system for my shitbox Wrangler. Sends CAN bus data back home to BUTLER for preventitive diagnostics.
+<ins>**Jeep CAN Bus Interface:**</ins> (Early Development) Onboard telemetry system for my shitbox Wrangler. Sends CAN bus data back home to BUTLER for preventitive diagnostics.
 
 ## ===External Software Subsystems===
-<u>**Kitchen Recipe Screen:**</u> A mounted 1920x1080 monitor in the kitchen with chromium in kiosk mode. This functions as a display method for butler to display recipes as I am cooking in the kitchen.
+<ins>**Kitchen Recipe Screen:**</ins> A mounted 1920x1080 monitor in the kitchen with chromium in kiosk mode. This functions as a display method for butler to display recipes as I am cooking in the kitchen.
 
-<u>**Resume and Application Pipeline ("Get a God Damn Job, Al"):**</u> A fully automated resume creation and job applier. Creates resumes tailored to each listing by pulling from a central pool of information containing my background and projects, then applies using them.
+<ins>**Resume and Application Pipeline ("Get a God Damn Job, Al"):**</ins> A fully automated resume creation and job applier. Creates resumes tailored to each listing by pulling from a central pool of information containing my background and projects, then applies using them.
 
-<u>**Minecraft Server Control:**</u> Allows BUTLER to turn on the minecraft server, read its data (playercount, etc) and execute commands for management. 
+<ins>**Minecraft Server Control:**</ins> Allows BUTLER to turn on the minecraft server, read its data (playercount, etc) and execute commands for management. 
 
-<u>**Minecraft Player Interface:**</u> (Fall 26 Grad Research) Allows BUTLER to play minecraft on the server.
+<ins>**Minecraft Player Interface:**</ins> (Fall 26 Grad Research) Allows BUTLER to play minecraft on the server.
 
-<u>**Discord Bot:**</u> Discord interface so BUTLER can be in discord and interacted with. Allows BUTLER to join a voice channel and speak with users. Also supports text based communication. All functions are available through discord as normal - communication input is flattened before it reaches the LLM.
+<ins>**Discord Bot:**</ins> Discord interface so BUTLER can be in discord and interacted with. Allows BUTLER to join a voice channel and speak with users. Also supports text based communication. All functions are available through discord as normal - communication input is flattened before it reaches the LLM.
 
 ## ===Internal Subsystems===
 <u>**[World Context System (WCS)](docs/WCS.md):**</u> Handles state data for the environment. This includes things like weather, user location, what is going on in the room, what a user is doing.
