@@ -26,30 +26,64 @@
 
 </div>
 
-B.U.T.L.E.R. is a local-first, voice-first AI assistant for conversation, home
-automation, and engineering work. It combines local language-model inference,
-speech recognition and synthesis, conversation memory, home integrations, and
-an extensible tool system. The launcher supervises the cooperating services
-that make up a full deployment.
+BUTLER is an entirely locally hosted, real-time, voice interaction based artifical intelligence designed to run the house and assist with various projects. It combines a locally hosted language model, locally hosted speech recognition model, memory and awareness system, and IoT node subsytems to create a dynamic, interactable AI system. 
 
 
-## What it can do
+## What It Does
 
 <p align="center">
   <img src="docs/assets/promo.gif" alt="Butler promo">
 </p>
 
-- Hold voice or text conversations through an OpenAI-compatible local model
-- Remember conversations and explicitly saved facts in the local SQLite store
-- Control configured smart switches and other independent integrations
-- Observe configured lights and the coffee plug through the read-only [Device Information System](docs/DIS.md)
-- Receive cached, timestamped outdoor weather through the [World Context System](docs/WCS.md)
-- Use MCP tools for local services, files, KiCad, and Minecraft diagnostics
-- Run durable background jobs without blocking the foreground conversation
-- Accept text commands over a private Tailscale connection
-- Place allowlisted phone calls and receive allowlisted SMS commands
-- Drive a remote pygame information display
-- Expose a read-only debug dashboard for health, latency, and tool telemetry
+- Interacts with the user through a distributed microphone/speaker system in the house, or via text, discord, phone, and console. Can place and recieve phone calls on behalf of the user.
+- Stores memories based on interactions, world state, and device interactions. Uses a smaller LLM to compartmentalize memories, find relations, and create new concepts in its memory and awareness database
+- Controls plethora of home devices, automotive systems, and software systems and monitors realtime diagnostic data. [Device Information System](docs/DIS.md)
+- Stays aware of world context. I.e. stays aware of whether the lights are on or off, what the room temp is like, etc to create a whole picture of the environment it is interacting with. [World Context System](docs/WCS.md)
+- Can run durable background jobs or queue up engineering agents on a separate server. (BUTLER does not write code or design circuits directly, this is delegated to an agent running on a dedicated server)
+- Exposes diagnostic data through a web based dashboard.
+
+## ===External Hardware Subsystems (IoT Nodes)===
+<u>**Houseplant Watering System:**</u> In-house designed and JLCPCB-fabcricated relay control board. Draws power from 12V laptop charger, connects via embedded raspiberry pi pico to MQTT broker. Activates pumps via relay to water a Monstera, Trailing Red, and Philodendron. Water drains from pots back into basin.
+
+<u>**Houseplant Soil Monitoring System:**</u> (Designed, but not fabricated) In-house designed soil moisture sensor. Operates of extremely low power from onboard solar panel. Remains in dormant state for most of operational time, then sends data package to mqtt broker.
+
+<u>**Room Temperature and Humidity Hysteresis System:**</u> In-House designed room temperature and humidity system that aims to keep the studio apartment at a comfortable temperature and humidity year round. When humidity drops below 40%, it sends a ping to BUTLER to activate the humidifier. When humidity is above 50% it sends a ping to turn it off. Similar for temperature.
+
+<u>**Smart Lights, Fan, Coffee Pot:**</u> All lights in the house have been rewired with Tapo/Kasa smart switches. The fan and coffee pot operate off of Kasa smart plugs. BUTLER can freely interact with these.
+
+<u>**Jeep CAN Bus Interface:**</u> (Early Development) Onboard telemetry system for my shitbox Wrangler. Sends CAN bus data back home to BUTLER for preventitive diagnostics.
+
+## ===External Software Subsystems===
+<u>**Kitchen Recipe Screen:**</u> A mounted 1920x1080 monitor in the kitchen with chromium in kiosk mode. This functions as a display method for butler to display recipes as I am cooking in the kitchen.
+
+<u>**Resume and Application Pipeline ("Get a God Damn Job, Al"):**</u> A fully automated resume creation and job applier. Creates resumes tailored to each listing by pulling from a central pool of information containing my background and projects, then applies using them.
+
+<u>**Minecraft Server Control:**</u> Allows BUTLER to turn on the minecraft server, read its data (playercount, etc) and execute commands for management. 
+
+<u>**Minecraft Player Interface:**</u> (Fall 26 Grad Research) Allows BUTLER to play minecraft on the server.
+
+<u>**Discord Bot:**</u> Discord interface so BUTLER can be in discord and interacted with. Allows BUTLER to join a voice channel and speak with users. Also supports text based communication. All functions are available through discord as normal - communication input is flattened before it reaches the LLM.
+
+## ===Internal Subsystems===
+<u>**[World Context System (WCS)](docs/WCS.md):**</u> Handles state data for the environment. This includes things like weather, user location, what is going on in the room, what a user is doing.
+<u>**[Device Information System (DIS)](docs/DIS.md):**</u> Handles device state data. This includes things like whether the lights are on or off, whether the watering system is functioning, server status.
+<u>**[Long Term Memory System (LTMS)](docs/LTMS.md):**</u> Handles long term memory, correlation, and concepts. Does not handle a long list of device status entries. Includes an LLM to extract and process meaningful information from user interations, DIS, WCS, and other sources. Turns observed patterns and concept in goals. Inlcudes a visual node-graph display to easily view stored memories. 
+<u>**[Goal Oriented Executor System (GOES)](docs/GOES.md):**</u> Not Yet Implemented. Takes action based off learned goals from the LTMS.
+
+
+## Requirements
+
+### Hardware:
+- RTX 5080 or greater (mb-core-v1 and faster-whisper model)
+- Nvidia a2000 or greater (for LTMS)
+- Roomscale microphone and speaker with echo cancellation (for barge-in)
+
+### Software:
+- Windows or Ubuntu for deployment, basic development can happen on macOS.
+- Python 3.12
+- [Ollama](https://ollama.com/) with a configured chat model
+- The packages in `requirements/runtime-py312.txt`
+- Access to Tailscale, Twilio (optional), Elevenlabs (optional), AWS, and OpenWeather.
 
 ## Architecture
 
@@ -79,24 +113,6 @@ For a deeper technical assessment, see
 [Architecture Review](docs/ARCHITECTURE_REVIEW.md). Awareness design and status
 live in [Awareness and Memory](docs/awareness-memory/README.md).
 
-## Requirements
-
-For the core text agent:
-
-- Python 3.12
-- [Ollama](https://ollama.com/) with a configured chat model
-- The packages in `requirements/runtime-py312.txt`
-
-Additional features require additional infrastructure:
-
-- Room voice: PortAudio-compatible audio hardware and libraries
-- InfoPanel: `requirements/display-py312.txt`
-- Existing display/device MQTT integrations: a reachable MQTT broker
-- Validated room-audio and GPU-pinning deployment: Windows with NVIDIA GPUs
-
-Linux and macOS can run individual services, but the complete deployed stack is
-currently optimized for Windows. Optional integrations may also require Node.js,
-Tailscale, Twilio, ElevenLabs, AWS, or OpenWeather.
 
 ## Quick start
 
@@ -191,9 +207,7 @@ conversation history, and hardware firmware have not been deleted or migrated.
 ## Application database
 
 Conversation history/saved facts, background jobs and phone records share
-`db/butler.sqlite3`, configured by `BUTLER_DB_PATH`. Butler creates and migrates
-it before its workers start; no database server or Docker is needed. Old separate
-SQLite files are not imported. Memory clearing affects conversation tables only.
+`db/butler.sqlite3`, configured by `BUTLER_DB_PATH`. Memory clearing affects conversation tables only.
 See [database ownership and migration guide](docs/DATABASE.md).
 
 ## Interfaces
@@ -217,68 +231,28 @@ Windows users can run the same client through
 ### Debug dashboard
 
 Run `python -m butler.debug_dashboard`, then open
-`http://127.0.0.1:8787`. The dashboard shows interaction flow, component health,
-pipeline latency, prompt composition, model placement, memory usage, jobs, tool
-reliability, and available system telemetry. It is read-only and binds to
-loopback by default because it can expose private data.
+`http://127.0.0.1:8787`. The dashboard shows interaction flow, component health, pipeline latency, prompt composition, model placement, memory usage, jobs, tool reliability, and available system telemetry. It is read-only and binds to loopback by default because it can expose private data.
 
 ### Phone and SMS
 
 <<<<<<< HEAD
-#### Inbound calls
-
-The Twilio number's voice webhook points at Talos, which admits only allowlisted
-callers whose carrier attests the number (SHAKEN/STIR `TN-Validation-Passed-A`)
-and rejects everything else. Admitted calls go to the ElevenLabs agent through
-its register-call API, with a briefing from Talos memory. During the call, the
-agent uses server tools (`recall`, `house_status`, `ask_talos`), and the
-transcript goes back into Talos memory afterwards. The local listener
-(`butler/phone/inbound_server.py`, default `127.0.0.1:8431`) is published with
-Tailscale Funnel at `/phone` and is disabled by default. Setup, agent prompt,
-and tool definitions:
+#### Inbound calls 
+The Twilio number's voice webhook points at Talos, which admits only allowlisted callers whose carrier attests the number (SHAKEN/STIR `TN-Validation-Passed-A`) and rejects everything else. Admitted calls go to the ElevenLabs agent through its register-call API, with a briefing from Talos memory. During the call, the agent uses server tools (`recall`, `house_status`, `ask_talos`), and the transcript goes back into Talos memory afterwards. The local listener (`butler/phone/inbound_server.py`, default `127.0.0.1:8431`) is published with Tailscale Funnel at `/phone` and is disabled by default. Setup, agent prompt, and tool definitions:
 [`docs/phone-inbound/SETUP.md`](docs/phone-inbound/SETUP.md).
 
-### SMS Control
-=======
+### SMS and Phone Control
 Phone calls use ElevenLabs for the conversational voice agent and Twilio for
-PSTN transport. SMS commands enter the same agent path as local text chat. The
-tracked settings enable both integrations, but they become operational only
-when their required credentials, identifiers, URLs, and allowlists are present.
-The public phone bridge and SMS webhook should be the only internet-facing
-components; keep the main Butler runtime private.
+PSTN transport. SMS commands enter the same agent path as local text chat. The tracked settings enable both integrations, but they become operational only when their required credentials, identifiers, URLs, and allowlists are present. The public phone bridge and SMS webhook should be the only internet-facing components; keep the main Butler runtime private.
 >>>>>>> 1ef7b7c0f3f810da998e5b778ff6d855dffcaaa8
 
 Relevant variables are documented in `.env.example` and `settings.env`.
 
 ## Tools and integrations
-
-Butler merges tools from one or more Model Context Protocol servers into a
-single capability surface. The built-in server provides home automation,
-other local services. Optional servers can add:
-
-- General filesystem access with read-only defaults
-- KiCad assistance
-- Minecraft Forge/modpack diagnostics
-- Remote MCP services over streamable HTTP
-
-Set `BUTLER_MCP_SERVERS` to configure the full server list. Tool names must be
-unique; use `tool_prefix` when servers could collide. Detailed guides:
-
+Set `BUTLER_MCP_SERVERS` to configure the full server list. Tool names must be unique; use `tool_prefix` when servers could collide. Detailed guides:
 - [Tool Implementation Guide](docs/TOOL_IMPLEMENTATION_GUIDE.md)
 - [Filesystem MCP](docs/filesystem-mcp.md)
 - [Minecraft Diagnostics](docs/minecraft-forge-diagnostics.md)
 
-## Hardware
-
-Peripheral firmware is written for MicroPython on Raspberry Pi Pico W boards
-and deployed manually. Current entry points include:
-
-- `Peripherals/fan/main.py`
-- `Peripherals/Pump-Power-Controller/Firmware/main.py`
-
-Update device-specific Wi-Fi, MQTT, pin, and topic settings before copying a
-script to a board as `main.py`. The pump controller is maintained as a Git
-submodule.
 
 ## Repository layout
 
