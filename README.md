@@ -15,7 +15,7 @@
   <a href="#project-status"><img alt="Status: active development" src="https://img.shields.io/badge/status-active%20development-orange"></a>
 </p>
 
-<p align="center">This is not cramming a bunch of markdown files into opencode and it was not made in 4 days by Claude. This project was started sometime around April 2020. Claude/GPT still gets used because im not a geed. </p>
+<p align="center">This was not made in 4 days by Claude. This project was started sometime around April 2020. Claude/GPT still gets used because im not a geed. </p>
 
 <h2>Peripheral Systems</h2>
 
