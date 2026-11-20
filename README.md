@@ -66,8 +66,11 @@ BUTLER is an entirely locally hosted, real-time, voice interaction based artific
 
 ## ===Internal Subsystems===
 <u>**[World Context System (WCS)](docs/WCS.md):**</u> Handles state data for the environment. This includes things like weather, user location, what is going on in the room, what a user is doing.
+
 <u>**[Device Information System (DIS)](docs/DIS.md):**</u> Handles device state data. This includes things like whether the lights are on or off, whether the watering system is functioning, server status.
+
 <u>**[Long Term Memory System (LTMS)](docs/LTMS.md):**</u> Handles long term memory, correlation, and concepts. Does not handle a long list of device status entries. Includes an LLM to extract and process meaningful information from user interations, DIS, WCS, and other sources. Turns observed patterns and concept in goals. Inlcudes a visual node-graph display to easily view stored memories. 
+
 <u>**[Goal Oriented Executor System (GOES)](docs/GOES.md):**</u> Not Yet Implemented. Takes action based off learned goals from the LTMS.
 
 
