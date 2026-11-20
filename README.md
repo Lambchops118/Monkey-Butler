@@ -15,6 +15,8 @@
   <a href="#project-status"><img alt="Status: active development" src="https://img.shields.io/badge/status-active%20development-orange"></a>
 </p>
 
+<p align="center">This is not cramming a bunch of markdown files into opencode and it was not made in 4 days by Claude. This project was started sometime around April 2020. Claude/GPT still gets used because im not a geed. </p>
+
 <h2>Peripheral Systems</h2>
 
 <h3><a href="https://github.com/Lambchops118/Kitchen-Recipe-Screen">Kitchen Recipe Display Screen</a></h3>
@@ -43,26 +45,26 @@ BUTLER is an entirely locally hosted, real-time, voice interaction based artific
 - Exposes diagnostic data through a web based dashboard.
 
 ## ===External Hardware Subsystems (IoT Nodes)===
-<ins>**Houseplant Watering System:**</ins> In-house designed and JLCPCB-fabcricated relay control board. Draws power from 12V laptop charger, connects via embedded raspiberry pi pico to MQTT broker. Activates pumps via relay to water a Monstera, Trailing Red, and Philodendron. Water drains from pots back into basin.
+<ins><strong><a href="https://github.com/Lambchops118/Pump-Power-Controller">Houseplant Watering System</a>:</strong></ins> In-house designed and JLCPCB-fabcricated relay control board. Draws power from 12V laptop charger, connects via embedded raspiberry pi pico to MQTT broker. Activates pumps via relay to water a Monstera, Trailing Red, and Philodendron. Water drains from pots back into basin.
 
-<ins>**Houseplant Soil Monitoring System:**</ins> (Designed, but not fabricated) In-house designed soil moisture sensor. Operates of extremely low power from onboard solar panel. Remains in dormant state for most of operational time, then sends data package to mqtt broker.
+<ins><strong><a href="https://github.com/Lambchops118/Soil-Moisture-Sensor-Module">Houseplant Soil Monitoring System</a>:</strong></ins> (Designed, but not fabricated) In-house designed soil moisture sensor. Operates of extremely low power from onboard solar panel. Remains in dormant state for most of operational time, then sends data package to mqtt broker.
 
-<ins>**Room Temperature and Humidity Hysteresis System:**</ins> In-House designed room temperature and humidity system that aims to keep the studio apartment at a comfortable temperature and humidity year round. When humidity drops below 40%, it sends a ping to BUTLER to activate the humidifier. When humidity is above 50% it sends a ping to turn it off. Similar for temperature.
+<ins><strong><a href="https://github.com/Lambchops118/PoE-5V-Adapter">Room Temperature and Humidity Hysteresis System</a>:</strong></ins> In-House designed room temperature and humidity system that aims to keep the studio apartment at a comfortable temperature and humidity year round. When humidity drops below 40%, it sends a ping to BUTLER to activate the humidifier. When humidity is above 50% it sends a ping to turn it off. Similar for temperature.
 
 <ins>**Smart Lights, Fan, Coffee Pot:**</ins> All lights in the house have been rewired with Tapo/Kasa smart switches. The fan and coffee pot operate off of Kasa smart plugs. BUTLER can freely interact with these.
 
-<ins>**Jeep CAN Bus Interface:**</ins> (Early Development) Onboard telemetry system for my shitbox Wrangler. Sends CAN bus data back home to BUTLER for preventitive diagnostics.
+<ins><strong><a href="https://github.com/Lambchops118/Jeep-CAN-Bus-Interface">Jeep CAN Bus Interface</a>:</strong></ins> (Early Development) Onboard telemetry system for my shitbox Wrangler. Sends CAN bus data back home to BUTLER for preventitive diagnostics.
 
 ## ===External Software Subsystems===
-<ins>**Kitchen Recipe Screen:**</ins> A mounted 1920x1080 monitor in the kitchen with chromium in kiosk mode. This functions as a display method for butler to display recipes as I am cooking in the kitchen.
+<ins><strong><a href="https://github.com/Lambchops118/Kitchen-Recipe-Screen">Kitchen Recipe Screen</a>:</strong></ins> A mounted 1920x1080 monitor in the kitchen with chromium in kiosk mode. This functions as a display method for butler to display recipes as I am cooking in the kitchen.
 
-<ins>**Resume and Application Pipeline ("Get a God Damn Job, Al"):**</ins> A fully automated resume creation and job applier. Creates resumes tailored to each listing by pulling from a central pool of information containing my background and projects, then applies using them.
+<ins><strong><a href="https://github.com/Lambchops118/Get-A-God-Damn-Job-Al.">Resume and Application Pipeline ("Get a God Damn Job, Al")</a>:</strong></ins> A fully automated resume creation and job applier. Creates resumes tailored to each listing by pulling from a central pool of information containing my background and projects, then applies using them.
 
 <ins>**Minecraft Server Control:**</ins> Allows BUTLER to turn on the minecraft server, read its data (playercount, etc) and execute commands for management. 
 
 <ins>**Minecraft Player Interface:**</ins> (Fall 26 Grad Research) Allows BUTLER to play minecraft on the server.
 
-<ins>**Discord Bot:**</ins> Discord interface so BUTLER can be in discord and interacted with. Allows BUTLER to join a voice channel and speak with users. Also supports text based communication. All functions are available through discord as normal - communication input is flattened before it reaches the LLM.
+<ins><strong><a href="https://github.com/Lambchops118/Discord-Voice-Frontend">Discord Bot</a>:</strong></ins> Discord interface so BUTLER can be in discord and interacted with. Allows BUTLER to join a voice channel and speak with users. Also supports text based communication. All functions are available through discord as normal - communication input is flattened before it reaches the LLM.
 
 ## ===Internal Subsystems===
 <u>**[World Context System (WCS)](docs/WCS.md):**</u> Handles state data for the environment. This includes things like weather, user location, what is going on in the room, what a user is doing.
