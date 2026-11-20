@@ -366,7 +366,7 @@ class PhoneCallMemoryTests(unittest.TestCase):
         reset_default_phone_provider()
         reset_default_phone_store()
 
-    def test_ingest_writes_transcript_fact_findable_by_search(self) -> None:
+    def test_ingest_preserves_history_without_legacy_saved_fact(self) -> None:
         from butler.memory import MemoryStore
 
         tmpdir = tempfile.mkdtemp()
@@ -404,17 +404,17 @@ class PhoneCallMemoryTests(unittest.TestCase):
                     ):
                         ingest_phone_bridge_snapshot(snapshot)
                         facts_first = memory_store.search_facts("pharmacy")
+                        history_first = [tuple(row) for row in memory_store._conn.execute("SELECT role, content FROM conversation_messages WHERE session_id=? ORDER BY id", ("main-pc",))]
 
-                        # Re-ingesting an identical snapshot should not create a duplicate fact write.
+                        # Identical snapshots must not duplicate conversation summaries.
                         ingest_phone_bridge_snapshot(snapshot)
                         facts_second = memory_store.search_facts("pharmacy")
+                        history_second = [tuple(row) for row in memory_store._conn.execute("SELECT role, content FROM conversation_messages WHERE session_id=? ORDER BY id", ("main-pc",))]
 
-                    self.assertEqual(len(facts_first), 1)
-                    self.assertIn("pharmacy", facts_first[0].value.lower())
-                    self.assertEqual(facts_first[0].key, "phone_call_transcript:conv_mem")
-                    self.assertEqual(facts_first[0].scope, "session:main-pc")
-                    self.assertEqual(len(facts_second), 1)
-                    self.assertEqual(facts_first[0].updated_at, facts_second[0].updated_at)
+                    self.assertEqual([], facts_first)
+                    self.assertEqual([], facts_second)
+                    self.assertIn('pharmacy', str(history_first).lower())
+                    self.assertEqual(history_first, history_second)
                 finally:
                     store.close()
                     memory_store.close()

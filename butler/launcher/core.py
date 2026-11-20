@@ -571,7 +571,7 @@ class Supervisor:
         if self._cfg.use_api_models:
             self._say(
                 f"API mode ON: using hosted OpenAI LLM ({self._cfg.api_llm_model}); "
-                "STT stays local. Local Ollama will not be started."
+                "STT stays local. Chat Ollama will not be started; LTMS keeps its separate local worker when enabled."
             )
             if not config.has_secret("OPENAI_API_KEY"):
                 self._say(

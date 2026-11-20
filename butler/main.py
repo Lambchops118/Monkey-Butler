@@ -8,6 +8,7 @@ from butler import router
 from butler.config import load_environment
 from butler.dis import service as dis_service
 from butler.wcs import service as wcs_service
+from butler.ltms import service as ltms_service
 from butler.storage import initialize_database
 from butler.display import DisplayState
 from butler.phone import inbound_server as phone_inbound_server
@@ -36,6 +37,7 @@ def main() -> int:
 
     dis_service.start_service()
     wcs_service.start_service()
+    ltms_service.start_service()
     try:
         display_state = DisplayState()
         central_queue = queue.Queue()
@@ -77,6 +79,7 @@ def main() -> int:
             print("Exiting cleanly.")
         return 0
     finally:
+        ltms_service.stop_service()
         wcs_service.stop_service()
         dis_service.stop_service()
 

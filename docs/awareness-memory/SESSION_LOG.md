@@ -2360,3 +2360,230 @@ Current repository state: Uncommitted fix atop WCS work; no commit/reset or sub-
 Next permitted task: Separately assigned provider comparison or deployment acceptance; no broader subsystem expansion.
 Required reading for next session: docs/WCS.md, ADR-067 and implementation status.
 Explicit stop point: Actual failing prompt traced, bootstrap bug fixed/tested and running hourly data verified; no deterministic response path added.
+
+
+## 2026-11-19 - Bounded LTMS v1
+
+Session goal: Implement owner-approved simple local graph memory.
+Current phase: New LTMS bounded v1, not revival of archived Phase 6 dependencies.
+Bounded task completed: Shared SQLite memories/edges/jobs, background intake and
+local inference, atomic validated operations, embedding/lexical recall and one-hop
+context, legacy fact route retirement with immediate conversation history preserved.
+Files added: butler/ltms/{__init__,store,service,local_server}.py, docs/LTMS.md,
+tests/test_ltms.py, tests/test_ltms_model_acceptance.py.
+Files modified: butler/agent/runtime.py, butler/main.py, butler/phone/service.py,
+butler/storage_schema.py, docs/DATABASE.md, status/decisions/open questions/session
+log; tests/test_awareness_retirement.py, tests/test_phone_service.py, tests/test_wcs.py.
+Migrations added: 6 (ltms_graph); prior migration statements unchanged.
+Decisions made: ADR-068. No Mem0/import; immediate async learning; dedicated A2000
+Ollama, CPU all-minilm; operations validated before commit; reflection deferred.
+Assumptions confirmed or changed: Owner clarified no wait for extraction between
+turns. Archived awareness retirement deliberately retained the separate fact store.
+Tests run/passed: .venv-main/Scripts/python.exe -m unittest discover -s tests -p
+PATTERN -q: test_ltms.py 12, test_memory_store.py 11, test_unified_storage.py 12,
+test_run_command_stream.py 17, test_tool_ordering.py 5, test_phone_service.py 11,
+test_dis.py 19, test_wcs.py 24. Four non-catalog retirement tests also passed.
+Total deterministic passing: 115. DIS/WCS final runs permitted local fixture sockets.
+Local model: BUTLER_LTMS_LIVE_MODEL_TEST=1 test_ltms_model_acceptance.py passed one
+three-step learn/semantic recall/change/forget scenario on temporary storage, using
+qwen3:8b and all-minilm with a separately owned A2000 Ollama process. No controls.
+Compilation and git diff --check passed.
+Tests failed: Initial live run learned/recalled but rejected a malformed change
+operation; introduced schema-constrained output (no assertion relaxation), final
+run passed. Fixed test cleanup to close SQLite before temporary directory deletion.
+Initial phone test expected legacy saved facts; replaced with assertions that no
+legacy fact is written and stored conversation summaries remain idempotent. Its
+first replacement used replay-only history (which excludes system summaries);
+corrected to inspect stored conversation messages. WCS pre-WCS migration fixture
+needed to exclude LTMS ownership when simulating migrations 1-3; final run passed.
+Commands not run: Full repository suite, continuous soak, GUI/audio acceptance,
+full main-model live conversation acceptance, deployment restart. Sandboxed
+retirement/DIS/WCS discovery stalled; stopped specific test processes. Final
+DIS/WCS socket-enabled runs passed; full retirement catalog test not completed.
+Known limitations: Intake inbox crash window roughly 100 ms; sampled changes can
+miss transitions; model semantic correctness is not deterministic validation;
+no exact count/streak engine; bounded linear search; capacity caps and no automatic
+capacity scheduler. Failed jobs stop after three attempts. New-node edges require
+later batches. History versioning not promised. Socket timeouts are not hard
+wall-clock deadlines. See LTMS.md for explicit settings/limits/degradation.
+Security implications: Local inference only; strict mutation schemas/reference
+checks; memories are data, not action authorization. Owner-only conversation
+injection/learning; no external messaging or arbitrary SQL. Forget deletes node
+and incident edges; archived merge inputs remain until explicitly forgotten.
+Deployment implications: Downloads qwen3:8b and all-minilm; default runtime owns
+port 11435 Ollama pinned by A2000 UUID, separate from main chat Ollama. Models were
+exercised, but Butler was not restarted and production DB not manually migrated.
+Unresolved questions: Future tuning of consolidation/retrieval; not blockers for v1.
+Current repository state: Uncommitted implementation/documentation/tests; no
+physical commands, firmware changes or awareness reactivation.
+Next permitted task: Owner review/use of LTMS v1 and separately bounded tuning.
+Required reading for next session: docs/LTMS.md, docs/DATABASE.md, repository
+AGENTS.md, this handoff and current implementation status.
+Explicit stop point: LTMS v1. Executor and chained reflection remain future work.
+
+
+## 2026-11-19 - LTMS 2D diagnostic graph
+
+Session goal: Show stored LTMS nodes and edges for evaluation.
+Current phase: Bounded read-only visualization, no LTMS redesign.
+Bounded task completed: Dashboard /memory page and /api/ltms-graph snapshot endpoint;
+SVG directed labelled graph, pan/zoom/drag, fit, manual refresh, active/archived
+filter, loaded-view search and memory/evidence inspector.
+Files added: butler/debug_dashboard/memory_graph.py; static/memory.html,
+static/memory.css, static/memory.js; tests/test_memory_graph.py.
+Files modified: butler/debug_dashboard/server.py, static/index.html, docs/LTMS.md,
+IMPLEMENTATION_STATUS.md, DECISIONS.md, OPEN_QUESTIONS.md and this session log.
+Migrations added: None. No database or memory content changed by viewer.
+Decisions made: ADR-069. Native SVG; reuse dashboard read-only storage exception.
+Assumptions confirmed or changed: Real DB currently has 3 active memories and 0
+edges. Fixture DB verified actual directed labelled edges and archived nodes.
+Tests run: python -m unittest discover -s tests -p test_memory_graph.py -v (5 passed)
+and test_debug_dashboard.py -q (17 passed); node --check memory.js; Python
+compilation; git diff --check. PYTHONPATH points to existing .venv-main site-packages
+and `python` resolves to Inkscape's Python 3.12.12. Repo venv executable fails
+because its base Python312 is missing. Installed Python314 requires escalation
+and lacks dotenv; no dependencies installed or environment changed.
+Tests passed: 22 deterministic checks; browser verified real memory details,
+fixture graph edges, archives and search. Adjusted layout centering strength after
+browser review of sparse disconnected graph. Final browser view checked real DB.
+Tests failed: No failing test assertions. Initial commands could not launch the
+obsolete venv Python; reran with available compatible Python and existing packages.
+Commands not run: Full repository suite, model/physical/device acceptance, automated
+browser assertions, load benchmark. No runtime worker/main-agent restart.
+Known limitations: 250 nodes default/500 max, 2000 edges; latest-node subset and
+loaded-view text search only. No editing, clustering, live refresh or 3D/VR.
+Security implications: Local read-only diagnostics exposes memory/evidence under
+existing dashboard access boundaries; no external resources, inference or DB writes.
+Deployment implications: Restart existing debug dashboard to load new routes. Main
+Butler need not restart for this viewer. Preview servers were temporary QA only.
+Unresolved questions: Transient and duplicate-looking real memories warrant a
+separate learning-quality investigation if owner authorizes; no viewer blocker.
+Current repository state: Existing uncommitted LTMS work preserved; unrelated
+.claude/settings.local.json left untouched. No migrations/production writes.
+Next permitted task: Owner evaluation using graph; separately scoped tuning only.
+Required reading for next session: docs/LTMS.md viewer section and this handoff.
+Explicit stop point: Simple 2D read-only nodes/edges viewer. No executor/3D/learning
+policy expansion.
+
+
+## 2026-11-19 - Launcher LTMS/DIS/WCS and graph access
+
+Session goal: Make graph accessible and update launcher for implemented systems.
+Current phase: Bounded launcher integration.
+Bounded task completed: Open memory graph button starts/reuses dashboard and checks
+/memory availability; separate Information & memory tab persists implemented
+DIS/WCS/LTMS settings, fixes history wording and clarifies clearing isolation.
+Files added: None.
+Files modified: butler/launcher/{dashboard,gui,core}.py, settings.env,
+tests/test_launcher_{dashboard,llm_debug}.py, docs/LTMS.md and status/decision/
+open-question/session records.
+Migrations added: None.
+Decisions made: ADR-070; no separate launcher LTMS lifecycle or silent interpreter
+fallback for main runtime. Diagnostic buttons moved to their own row; system
+settings in separate tab to avoid crowding main launcher.
+Assumptions confirmed or changed: Dashboard runs independently from Butler, on
+demand through launcher. Configured venv base Python312 executable no longer
+exists. Main owns LTMS, so no duplicate process start in Supervisor.
+Tests run/passed: python -m unittest discover -s tests -p 'test_launcher*.py' -q:
+32 passed (including headless widget construction/persistence, graph URL reuse,
+old-server error and browser-opening callback). test_memory_graph.py: 5 passed.
+Compilation and git diff --check passed. Test interpreter was available Inkscape
+Python 3.12 with existing .venv-main site-packages supplied via PYTHONPATH.
+Tests failed: No assertions failed. Existing runtime --version probe confirms
+missing base interpreter; environment not rebuilt.
+Commands not run: Full repository suite, live native launcher UI, main-agent/model
+restart, hardware/control actions. No package installation.
+Known limitations: Fresh child startup from the configured runtime requires
+restoring its base Python installation; error now explicitly points to it. New
+widgets require reopening launcher; saved settings require restarting Butler.
+Security implications: Dashboard stays loopback/read-only; Windows dashboard child
+uses CREATE_NO_WINDOW. No cloud exposure or changes to action authorization.
+Deployment implications: Started operational diagnostic server hidden on 8787
+using available Python and existing packages, kept running for owner use; verified
+via launcher DashboardProcess.ensure_running('/memory') and browser showing 62
+active nodes and 11 edges at observation. Main Butler not restarted. Server is
+external to a newly reopened launcher, which will reuse without owning it.
+Unresolved questions: Restore old Python312 base or rebuild runtime separately.
+Current repository state: Prior LTMS/viewer changes preserved; uncommitted launcher
+updates. Unrelated .claude/settings.local.json untouched.
+Next permitted task: Owner uses graph/launcher; separately bounded runtime repair
+or LTMS learning-quality fixes only when assigned.
+Required reading: docs/LTMS.md launcher section and this record.
+Explicit stop point: Launcher/access integration. No LTMS policy changes, 3D/VR or
+executor implementation.
+
+
+## 2026-11-19 - Stop direct DIS status ingestion into LTMS
+
+Session goal: Stop device status evidence from filling LTMS; defer DIS package.
+Current phase: Bounded LTMS ingestion correction.
+Bounded task completed: Removed DIS cache reads; reject source dis: submissions,
+discard old DIS jobs on startup and before inference; clarify device-status prompt
+exclusion while preserving explicit conversational preferences.
+Files added: None.
+Files modified: butler/ltms/service.py, tests/test_ltms.py, docs/LTMS.md and
+status/decision/open-question/session records.
+Migrations added: None.
+Decisions made: ADR-071; future DIS package is not implemented or scaffolded.
+Assumptions confirmed or changed: WCS remains in scope as existing input. No stored
+memories or edges should be removed by this cutoff.
+Tests run: test_ltms.py full 15 cases; then 14-case suite excluding the environment-
+blocked main-runtime import check; Python compilation and git diff --check.
+Tests passed: 14 (including three new checks for no DIS cache read, rejected direct
+input, old pending/failed queue cleanup, preserved memory and no model invocation).
+Tests failed: Existing test_retired_fact_tools_absent_and_history_still_readable
+cannot import main runtime: pydantic_core._pydantic_core unavailable using current
+Inkscape Python312 plus existing .venv-main site-packages. No assertion was changed
+or test weakened; remaining 14 cases reran and passed.
+Commands not run: Live-model acceptance, full repository tests, Butler restart,
+production DB queue cleanup or node deletion. Tests use temporary SQLite only.
+Known limitations: Running Butler still uses previously loaded code until restart.
+Routine statuses repeated in conversation are discouraged by prompt; direct DIS
+feed cutoff is deterministic, semantic extraction policy remains model-dependent.
+Security implications: Less raw device evidence reaches LTMS; no new access paths.
+Deployment implications: Restart Butler to stop the old sampler and discard old
+DIS pending/failed jobs. Existing memories and graph remain unchanged.
+Unresolved questions: Future DIS status-package contract requires its own bounded
+assignment. Existing noisy memories can be reviewed/cleaned separately.
+Current repository state: Uncommitted prior work preserved; no runtime/deployment
+or unrelated edits performed by this change.
+Next permitted task: Owner restart/evaluation; future package or cleanup only if
+assigned.
+Required reading: docs/LTMS.md, ADR-071 and this record.
+Explicit stop point: Direct DIS ingestion cutoff, no replacement system.
+
+
+## 2026-11-19 - Remove persisted DIS status updates from LTMS
+
+Session goal: Owner-directed deletion of existing DIS status updates.
+Current phase: Bounded data cleanup.
+Bounded task completed: Inspected source provenance and conversational status
+entries, deleted 90 LTMS nodes, 10 incident edges and 70 DIS extraction jobs in one
+BEGIN IMMEDIATE transaction. 18 LTMS memories remained at commit.
+Files added: None.
+Files modified: Production shared DB LTMS-owned rows only; status and session log.
+Migrations added: None.
+Decisions made: Delete 85 directly DIS-sourced entries plus five individually
+reviewed status statements extracted through owner/assistant conversation inputs;
+preserve weather/other memories and all non-LTMS data. No general cleanup rule or
+backup/export retaining deleted memory content was added.
+Assumptions confirmed or changed: Some device status statements had conversational
+rather than dis: source provenance, requiring explicit inspected IDs.
+Tests run/passed: Transaction checked non-LTMS table row counts unchanged, no
+remaining DIS-source memories and no dangling edges; independent post-commit
+read verified zero DIS memories/jobs and zero PRAGMA foreign_key_check violations.
+Tests failed: None.
+Commands not run: Unit suite (no runtime code change), model calls, Butler restart,
+physical controls. No full-file deletion, vacuum, migration or history clearing.
+Known limitations: Prior running Butler code can admit new DIS data until restarted
+with the already-implemented cutoff. This cleanup does not alter learning policy.
+Security implications: Authorized permanent deletion of selected LTMS rows and
+incident edges only; other module data preserved.
+Deployment implications: Refresh graph to see deletion. Restart Butler if the
+previous direct-DIS ingestion code is still running.
+Unresolved questions: No cleanup blocker; future DIS package remains deferred.
+Current repository state: Prior uncommitted code preserved; only current records
+and documentation changed by this task.
+Next permitted task: Owner graph evaluation; separately assigned work only.
+Required reading: docs/LTMS.md and current implementation status.
+Explicit stop point: Remove existing device-status memory data; no other cleanup.

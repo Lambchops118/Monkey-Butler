@@ -387,52 +387,6 @@ def _resource_tool_definitions() -> list[dict[str, Any]]:
         },
         {
             "type": "function",
-            "name": "memory_admin",
-            "description": (
-                "Durable Butler memory. Use 'remember' when the user explicitly asks you to "
-                "remember a stable user, project, environment, or session fact, and 'list' to "
-                "look up facts already stored. This is long-term preference and project memory, "
-                "not current device state."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["remember", "list"],
-                        "description": "remember stores a fact; list retrieves relevant facts.",
-                    },
-                    "key": {
-                        "type": "string",
-                        "description": "Short stable key for the fact, such as preferred_response_style. Required by remember.",
-                    },
-                    "value": {
-                        "type": "string",
-                        "description": "The durable fact to remember. Required by remember.",
-                    },
-                    "scope": {
-                        "type": "string",
-                        "description": "Memory scope: user, project, global, or session. Defaults to user.",
-                    },
-                    "salience": {
-                        "type": "integer",
-                        "description": "Importance from 1 to 10. Defaults to 5.",
-                    },
-                    "query": {
-                        "type": "string",
-                        "description": "Optional search text for the list action.",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum facts to return for the list action. Defaults to 8.",
-                    },
-                },
-                "required": ["action"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "type": "function",
             "name": "phone",
             "description": (
                 "Outbound phone calls through the configured ElevenLabs/Twilio phone agent, and "
@@ -910,12 +864,9 @@ def _get_prompt_memory(
     if memory_store is None or PROMPT_MEMORY_CHAR_LIMIT <= 0:
         return None
     try:
-        return memory_store.get_prompt_memory(
-            session_id,
-            command,
-            max_chars=PROMPT_MEMORY_CHAR_LIMIT,
-            include_session_summary=include_session_summary,
-        )
+        from butler.ltms import service as ltms
+        ltms.submit(dict(source='owner_message', session_id=session_id, user=command[:8000]))
+        return ltms.prompt_memory(command, PROMPT_MEMORY_CHAR_LIMIT)
     except Exception as exc:
         print(f"Butler memory retrieval failed: {_truncate_text(str(exc), 300)}")
         return None
@@ -952,7 +903,12 @@ def _record_memory_turn(
     tool_messages: list[dict[str, Any]] | None = None,
     tool_schemas: list[dict[str, Any]] | None = None,
     request_id: str | None = None,
+    learn_ltms: bool = False,
 ) -> None:
+    if learn_ltms:
+        from butler.ltms import service as ltms
+        ltms.submit(dict(source="assistant_completion", session_id=session_id,
+                         assistant=response_text[:4000], tools=(tool_messages or [])[-4:]))
     if memory_store is None:
         return
     try:
@@ -1745,53 +1701,8 @@ def _invoke_host_tool(
                 {"success": False, "message": f"Unknown MCP server '{server_name}'."}
             )
         return json.dumps({"success": True, "servers": servers})
-    if name == "remember_memory_fact":
-        memory_store = _get_memory_store()
-        if memory_store is None:
-            return json.dumps({"success": False, "message": "Butler memory is disabled or unavailable."})
-
-        scope = _memory_scope_for_tool(str(parsed_arguments.get("scope") or "user"), session_id)
-        key = str(parsed_arguments.get("key") or "").strip()
-        value = str(parsed_arguments.get("value") or "").strip()
-        salience = int(parsed_arguments.get("salience") or 5)
-        memory_store.upsert_fact(
-            scope,
-            key,
-            value,
-            salience=salience,
-            source_session_id=session_id,
-        )
-        return json.dumps(
-            {
-                "success": True,
-                "scope": scope,
-                "key": key,
-                "message": "Memory fact stored.",
-            }
-        )
-    if name == "list_memory_facts":
-        memory_store = _get_memory_store()
-        if memory_store is None:
-            return json.dumps({"success": False, "facts": []})
-
-        query = str(parsed_arguments.get("query") or "")
-        limit = int(parsed_arguments.get("limit") or 8)
-        facts = memory_store.search_facts(query, limit=limit)
-        return json.dumps(
-            {
-                "success": True,
-                "facts": [
-                    {
-                        "scope": fact.scope,
-                        "key": fact.key,
-                        "value": fact.value,
-                        "salience": fact.salience,
-                        "updated_at": fact.updated_at,
-                    }
-                    for fact in facts
-                ],
-            }
-        )
+    if name in ("remember_memory_fact", "list_memory_facts"):
+        return json.dumps({"success": False, "message": "Legacy saved facts retired; LTMS learns asynchronously and supplies contextual recall."})
     if name == "place_phone_call":
         from butler.phone import place_phone_call
 
@@ -1980,7 +1891,8 @@ def run_command(
         except Exception as exc:
             print(f"Butler memory session write failed: {_truncate_text(str(exc), 300)}")
             memory_store = None
-    memory_block = _get_prompt_memory(memory_store, session_id, command)
+    memory_block = (_get_prompt_memory(memory_store, session_id, command)
+                    if tool_access == _tool_access.FULL else None)
     prompt_sections = _build_prompt_sections(
         command,
         session_id,
@@ -2116,6 +2028,7 @@ def run_command(
         command,
         response_text,
         interaction_mode=mode,
+        learn_ltms=tool_access == _tool_access.FULL,
     )
     if benchmark:
         benchmark.set_response_text(response_text)
@@ -2774,6 +2687,7 @@ def run_command_stream(
                 tool_messages=tool_history,
                 tool_schemas=tool_defs,
                 request_id=request_id,
+                learn_ltms=tool_access == _tool_access.FULL,
             )
             yield result_note
             _emit_runtime_telemetry(
@@ -3017,6 +2931,7 @@ def run_command_stream(
                 tool_messages=tool_history,
                 tool_schemas=tool_defs,
                 request_id=request_id,
+                learn_ltms=tool_access == _tool_access.FULL,
             )
         _emit_runtime_telemetry(
             telemetry_callback,

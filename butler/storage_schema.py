@@ -21,6 +21,9 @@ TABLE_OWNERS = {
     "wcs_sources": "wcs",
     "wcs_observations": "wcs",
     "wcs_hourly_forecasts": "wcs",
+    "ltms_memories": "ltms",
+    "ltms_edges": "ltms",
+    "ltms_jobs": "ltms",
 }
 
 # (version, name, ordered SQL statements). SQL runs in one transaction.
@@ -179,6 +182,22 @@ MIGRATIONS = (
             category TEXT NOT NULL REFERENCES wcs_sources(category) ON DELETE CASCADE,
             valid_from REAL NOT NULL, data_json TEXT NOT NULL,
             PRIMARY KEY(category, valid_from))""",
+    )),
+
+    (6, "ltms_graph", (
+        """CREATE TABLE ltms_memories (
+            id TEXT PRIMARY KEY, content TEXT NOT NULL, source TEXT NOT NULL,
+            updated_at REAL NOT NULL, archived INTEGER NOT NULL DEFAULT 0,
+            embedding TEXT, embedding_model TEXT)""",
+        """CREATE TABLE ltms_edges (
+            source_id TEXT NOT NULL REFERENCES ltms_memories(id) ON DELETE CASCADE,
+            target_id TEXT NOT NULL REFERENCES ltms_memories(id) ON DELETE CASCADE,
+            relation TEXT NOT NULL, PRIMARY KEY(source_id,target_id,relation))""",
+        "CREATE INDEX ltms_edge_target ON ltms_edges(target_id)",
+        """CREATE TABLE ltms_jobs (
+            id TEXT PRIMARY KEY, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0,
+            error TEXT, created_at REAL NOT NULL)""",
     )),
 
 )

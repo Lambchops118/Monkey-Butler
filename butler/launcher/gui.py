@@ -83,9 +83,12 @@ class LauncherGUI:
         notebook.pack(fill="both", expand=True)
 
         settings_tab = ttk.Frame(notebook)
+        systems_tab = ttk.Frame(notebook)
         logs_tab = ttk.Frame(notebook)
         llm_tab = ttk.Frame(notebook)
         notebook.add(settings_tab, text="Launcher")
+        notebook.add(systems_tab, text="Information & memory")
+        self._build_system_settings(systems_tab)
         notebook.add(logs_tab, text="Logs")
         notebook.add(llm_tab, text="LLM I/O")
 
@@ -233,10 +236,16 @@ class LauncherGUI:
             buttons, text="Clear chat history…", command=self._on_clear_chat_history
         )
         self.btn_clear_chat.pack(side="left")
+        diagnostics = ttk.Frame(outer)
+        diagnostics.pack(fill="x", pady=(0, 6))
         self.btn_dashboard = ttk.Button(
-            buttons, text="Open debug console", command=self._on_open_dashboard
+            diagnostics, text="Open debug console", command=self._on_open_dashboard
         )
         self.btn_dashboard.pack(side="left", padx=6)
+        self.btn_memory_graph = ttk.Button(
+            diagnostics, text="Open memory graph", command=lambda: self._on_open_dashboard('/memory')
+        )
+        self.btn_memory_graph.pack(side="left", padx=6)
         self.status = ttk.Label(buttons, text="idle")
         self.status.pack(side="right")
 
@@ -381,7 +390,7 @@ class LauncherGUI:
         self.var_memory = tk.BooleanVar(value=True)
         self.var_inject_time = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            injected, text="Conversation memory (history + saved facts)", variable=self.var_memory
+            injected, text="Conversation history / continuity", variable=self.var_memory
         ).pack(anchor="w")
         ttk.Checkbutton(
             injected, text="Current date & time", variable=self.var_inject_time
@@ -399,6 +408,37 @@ class LauncherGUI:
         self.btn_test_tone = ttk.Button(volume, text="Test sound", command=self._on_test_tone)
         self.btn_test_tone.pack(side="left", padx=(4, 0))
 
+    def _build_system_settings(self, parent):
+        self.var_dis = tk.BooleanVar(value=True)
+        self.var_wcs = tk.BooleanVar(value=True)
+        self.var_dis_summary = tk.BooleanVar(value=True)
+        self.var_wcs_summary = tk.BooleanVar(value=True)
+        self.var_ltms = tk.BooleanVar(value=True)
+        systems = ttk.LabelFrame(parent, text="Information & long-term memory", padding=6)
+        systems.pack(fill="x", pady=(8, 0))
+        for label, variable in (
+            ("DIS device collection", self.var_dis),
+            ("DIS device context in owner turns", self.var_dis_summary),
+            ("WCS weather collection", self.var_wcs),
+            ("WCS weather context in owner turns", self.var_wcs_summary),
+            ("LTMS background learning + recall (local A2000)", self.var_ltms),
+        ):
+            ttk.Checkbutton(systems, text=label, variable=variable).pack(anchor="w")
+        self.var_ltms_model = tk.StringVar()
+        self.var_ltms_embed = tk.StringVar()
+        self.var_ltms_url = tk.StringVar()
+        self.var_ltms_gpu = tk.StringVar()
+        for label, variable in (
+            ("Memory model", self.var_ltms_model), ("CPU embedding model", self.var_ltms_embed),
+            ("Memory Ollama URL", self.var_ltms_url), ("GPU UUID (blank = detect A2000)", self.var_ltms_gpu),
+        ):
+            row = ttk.Frame(systems)
+            row.pack(fill="x", pady=2)
+            ttk.Label(row, text=label).pack(side="left")
+            ttk.Entry(row, textvariable=variable, width=26).pack(side="right")
+        ttk.Label(systems, text="Started by Butler; settings apply after restart.\nLTMS turn learning/recall also requires conversation history.", wraplength=370).pack(anchor="w", pady=(6, 0))
+
+
     # settings.env keys behind the prompt-context boxes, with their defaults.
     # ``invert`` marks a checkbox whose "on" means the variable is off.
     def _prompt_context_settings(self) -> list[tuple[tk.BooleanVar, str, bool, bool]]:
@@ -407,6 +447,19 @@ class LauncherGUI:
             (self.var_reduce_kicad, "BUTLER_REDUCE_KICAD_TOOL_SURFACE", True, False),
             (self.var_memory, "BUTLER_MEMORY_ENABLED", True, False),
             (self.var_inject_time, "BUTLER_INJECT_CURRENT_TIME", True, False),
+            (self.var_dis, "BUTLER_DIS_ENABLED", True, False),
+            (self.var_dis_summary, "BUTLER_DIS_SUMMARY_ENABLED", True, False),
+            (self.var_wcs, "BUTLER_WCS_ENABLED", True, False),
+            (self.var_wcs_summary, "BUTLER_WCS_SUMMARY_ENABLED", True, False),
+            (self.var_ltms, "BUTLER_LTMS_ENABLED", True, False),
+        ]
+
+    def _ltms_text_settings(self):
+        return [
+            (self.var_ltms_model, 'BUTLER_LTMS_MODEL', 'qwen3:8b'),
+            (self.var_ltms_embed, 'BUTLER_LTMS_EMBED_MODEL', 'all-minilm'),
+            (self.var_ltms_url, 'BUTLER_LTMS_OLLAMA_URL', 'http://127.0.0.1:11435'),
+            (self.var_ltms_gpu, 'BUTLER_LTMS_GPU', ''),
         ]
 
     def _on_toggle_tools(self) -> None:
@@ -500,6 +553,8 @@ class LauncherGUI:
             value = config.setting_bool(key, default)
             var.set(not value if invert else value)
         self.var_volume.set(str(self.cfg.speaker_volume))
+        for variable, key, default in self._ltms_text_settings():
+            variable.set(config.get_setting(key, default))
         self._on_toggle_api()
         self._on_toggle_tools()
 
@@ -555,6 +610,8 @@ class LauncherGUI:
         for var, key, _default, invert in self._prompt_context_settings():
             checked = var.get()
             config.set_setting(key, "1" if (not checked if invert else checked) else "0")
+        for variable, key, default in self._ltms_text_settings():
+            config.set_setting(key, variable.get().strip() or default)
         self._apply_volume()
 
     def _apply_volume(self) -> None:
@@ -621,7 +678,7 @@ class LauncherGUI:
             "Clear conversation memory",
             "This PERMANENTLY deletes:\n\n"
             "  • the persistent conversation store (facts, summaries, history)\n\n"
-            "Jobs, phone records and other application data are not affected. This cannot "
+            "LTMS memories, DIS/WCS data, jobs and phone records are not affected. This cannot "
             "be undone. Proceed?",
             icon="warning",
             default="no",
@@ -732,25 +789,27 @@ class LauncherGUI:
         self.btn_start.config(state="normal")
         self.btn_stop.config(state="disabled")
 
-    def _on_open_dashboard(self) -> None:
+    def _on_open_dashboard(self, path: str = '') -> None:
         # Works whether or not Butler is running: the console only reads logs
         # and databases. Starting it can take a few seconds, so stay off the
         # Tk thread and only touch widgets back on it.
         self.btn_dashboard.config(state="disabled")
-        threading.Thread(target=self._open_dashboard_worker, daemon=True).start()
+        self.btn_memory_graph.config(state="disabled")
+        threading.Thread(target=self._open_dashboard_worker, args=(path,), daemon=True).start()
 
-    def _open_dashboard_worker(self) -> None:
+    def _open_dashboard_worker(self, path: str = '') -> None:
         import webbrowser
 
         try:
-            url = self.dashboard.ensure_running()
+            url = self.dashboard.ensure_running(path)
             webbrowser.open(url)
             self.root.after(0, lambda: self._on_dashboard_opened(url, None))
         except Exception as exc:  # noqa: BLE001 - surface any failure to the user
-            self.root.after(0, lambda: self._on_dashboard_opened(None, exc))
+            self.root.after(0, lambda error=exc: self._on_dashboard_opened(None, error))
 
     def _on_dashboard_opened(self, url: str | None, error: Exception | None) -> None:
         self.btn_dashboard.config(state="normal")
+        self.btn_memory_graph.config(state="normal")
         if error is not None:
             self._append_log("dashboard", f"open failed: {error}")
             messagebox.showerror("Debug console", str(error))

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Butler · Memory graph</title><link rel="stylesheet" href="/memory.css"></head>
+<body>
+<header><div><a href="/">← Debug console</a><h1>Memory graph <span>LTMS</span></h1>
+<p>Stored memories and their explicit relationships. Read-only.</p></div><button id="refresh">Refresh database</button></header>
+<div class="toolbar"><label>Find in view <input id="search" type="search" placeholder="Search memory text…"></label>
+<label><input id="archived" type="checkbox"> Include archived</label>
+<label>Node limit <select id="limit"><option>100</option><option selected>250</option><option>500</option></select></label>
+<button id="fit">Fit graph</button><span class="legend"><i></i> Active <i class="old"></i> Archived</span></div>
+<div id="status" role="status" aria-live="polite">Loading database…</div>
+<main><section class="graph-panel" aria-label="Memory graph">
+<svg id="graph" role="img" aria-label="Interactive memory nodes and relationship arrows" tabindex="0">
+<defs><marker id="arrow" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-4L9,0L0,4"/></marker></defs>
+<g id="viewport"><g id="edges"></g><g id="nodes"></g></g></svg>
+<div id="empty" hidden></div><div class="hint">Scroll to zoom · Drag background to pan · Drag nodes · Select a node or list entry to inspect</div>
+</section><aside><h2>Inspect memory</h2><div id="detail">Select a node to see its full text, evidence, and relationships.</div>
+<h2 id="list-heading">Memories</h2><div id="list"></div></aside></main>
+<script src="/memory.js"></script></body></html>

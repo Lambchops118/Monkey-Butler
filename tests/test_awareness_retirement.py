@@ -59,7 +59,7 @@ class AwarenessRetirementTests(unittest.TestCase):
         spawn.assert_not_called()
         blocking.assert_not_called()
 
-    def test_remember_fact_writes_only_active_sqlite_store(self):
+    def test_retired_saved_fact_path_cannot_write_or_restore_awareness(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = MemoryStore(Path(tmp) / 'memory.sqlite3')
             try:
@@ -68,9 +68,9 @@ class AwarenessRetirementTests(unittest.TestCase):
                     result = json.loads(runtime._invoke_host_tool(None,
                         'remember_memory_fact', {'key': 'units', 'value': 'metric'},
                         session_id='owner'))
-                self.assertTrue(result['success'])
-                self.assertNotIn('awareness_memory_synced', result)
-                self.assertEqual(store.search_facts('units')[0].value, 'metric')
+                self.assertFalse(result['success'])
+                self.assertIn('retired', result['message'].lower())
+                self.assertEqual([], store.search_facts('units'))
             finally:
                 store.close()
 

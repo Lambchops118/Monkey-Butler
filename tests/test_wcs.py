@@ -183,7 +183,7 @@ class WCSTests(unittest.TestCase):
         from butler import storage
         from butler.dis.models import Device, Reading
         from butler.dis.store import DeviceStore
-        owners = {k: v for k, v in storage.TABLE_OWNERS.items() if v != 'wcs'}
+        owners = {k: v for k, v in storage.TABLE_OWNERS.items() if v not in ('wcs', 'ltms')}
         with mock.patch.object(storage, 'MIGRATIONS', storage.MIGRATIONS[:3]), mock.patch.object(storage, 'TABLE_OWNERS', owners):
             device_store = DeviceStore(self.path)
             device = Device('test-lamp', 'Test lamp', 'unused', 'light')

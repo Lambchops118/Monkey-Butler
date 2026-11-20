@@ -243,3 +243,34 @@ while retaining an old collector's future schedule. ADR-067 addresses versioned
 bootstrap without clearing evidence or bypassing retry schedules on every
 restart. LLM behavior when the provider genuinely has no hourly coverage remains
 an observed reliability limit; this fix does not claim to eliminate that risk.
+
+
+## LTMS v1 follow-up (2026-11-19)
+
+No unresolved owner choice blocks bounded v1. Measure real household consolidation,
+retrieval latency/relevance and capacity before expanding it. Owner explicitly
+defers chained reflection (search -> traverse -> compare -> reflect -> merge ->
+relationships) and the DIS/WCS/LTMS-consuming executor to separate projects.
+
+
+## LTMS visualization observation (2026-11-19)
+
+Read-only viewer found three active memories, no edges, transient device-state
+statements and duplicate-looking lamp statements. A separately authorized learning
+quality investigation may assess these; this viewer assignment does not fix them.
+3D/AR/VR remains shelved. No owner choice blocks the 2D first pass.
+
+
+## Local launcher runtime installation (2026-11-19)
+
+.venv-runtime and other old environments point to missing Python312/python.exe.
+Fresh automatic launcher child startup requires restoring that base installation
+or a separately scoped environment rebuild. The diagnostic graph is running using
+an available compatible interpreter; main-runtime selection was not changed.
+
+
+## Future DIS-to-LTMS contract (2026-11-19)
+
+Owner defers a DIS status package for meaningful long-term evidence. Content,
+provenance, aggregation and delivery contract remain unassigned. Direct device
+status sampling is disabled; do not add a placeholder adapter.

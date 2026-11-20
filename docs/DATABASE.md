@@ -42,6 +42,7 @@ would require measurement before choosing another storage design.
 | Phone (`PhoneCallStore`) | `phone_calls`, `phone_call_events` |
 | DIS | `dis_devices`, `dis_observations`, `dis_health` |
 | WCS | `wcs_sources`, `wcs_observations`, `wcs_hourly_forecasts` |
+| LTMS | `ltms_memories`, `ltms_edges`, `ltms_jobs` |
 | Storage | `butler_schema_migrations` |
 
 Conversation records retain real paired tool exchanges/schema metadata and
@@ -153,3 +154,6 @@ recorded unrelated personality assertion was not included in this bounded run.
 
 Stop at unified storage. New product systems, data import, whole-database reset
 and startup-service installation are separate assignments.
+
+Migration 6 implements LTMS; see [LTMS.md](LTMS.md). Legacy fact tables remain
+for schema compatibility but no longer feed agent recall. No fact import.

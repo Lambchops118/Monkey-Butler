@@ -1064,7 +1064,20 @@ class DebugRequestHandler(BaseHTTPRequestHandler):
         if path == "/":
             self._serve_file(STATIC_ROOT / "index.html", "text/html; charset=utf-8")
             return
+        if path in ("/memory", "/memory/"):
+            self._serve_file(STATIC_ROOT / "memory.html", "text/html; charset=utf-8")
+            return
+        if path == "/api/ltms-graph":
+            from .memory_graph import read_memory_graph
+            query = parse_qs(parsed.query)
+            limit = _bounded_int((query.get("limit") or [250])[0], 250, minimum=1, maximum=500)
+            self._write_json(HTTPStatus.OK, read_memory_graph(
+                self.server.snapshot_service.memory_db, limit=limit,
+                archived=(query.get("archived") or ["0"])[0] == "1"))
+            return
         static_files = {
+            "/memory.css": ("memory.css", "text/css; charset=utf-8"),
+            "/memory.js": ("memory.js", "application/javascript; charset=utf-8"),
             "/styles.css": ("styles.css", "text/css; charset=utf-8"),
             "/app.js": ("app.js", "application/javascript; charset=utf-8"),
         }

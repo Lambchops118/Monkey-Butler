@@ -744,3 +744,43 @@ and schedules immediate background collection once. Same-version restarts retain
 backoff/reservations; different place/units/provider still invalidates old facts.
 Do not clear conversation/WCS data or force API reads on every user request as a
 substitute. No deterministic conversational response is introduced.
+
+
+## ADR-068 - Bounded SQLite LTMS (2026-11-19)
+
+Owner authorizes autonomous memory selection/organization/forgetting from owner
+turns and DIS/WCS evidence, using graph nodes/edges in shared SQLite. No Mem0.
+Per-turn asynchronous learning, CPU embedding recall, preserved immediate history;
+retire saved-fact paths without import. Dedicated A2000 inference. Strict atomic
+operation batches; no arbitrary SQL or execution authority. Chained reflection
+and the executor are deferred. See ../LTMS.md.
+
+
+## ADR-069 - Read-only local LTMS graph inspection (2026-11-19)
+
+Owner selected a simple 2D nodes/edges viewer before revisiting 3D/AR/VR. Reuse the
+existing debug dashboard and query-only database projection exception. Buildless
+SVG requires no rendering package or remote assets. Show only persisted edges;
+positions/search highlighting do not create semantic relationships. Preserve
+bounded coverage and explicit unavailable/empty states; no memory edits or learning
+changes in this assignment.
+
+
+## ADR-070 - Launcher owns diagnostic access, main owns LTMS (2026-11-19)
+
+Open memory graph uses the existing independently managed debug-dashboard process;
+no second LTMS worker is created by the launcher. Expose DIS/WCS and LTMS settings
+in a dedicated tab and preserve conversation continuity/clearing boundaries. Reuse
+an existing external dashboard without taking ownership; report obsolete routes
+rather than killing unknown processes. Preserve configured runtime selection and
+report missing base-Python installation rather than silently switching main-agent
+environments.
+
+
+## ADR-071 - Defer DIS evidence ingestion into LTMS (2026-11-19)
+
+Owner stops all direct device status input, including transitions/errors, pending a
+separately designed DIS status package. Do not poll DIS for LTMS. Reject direct
+DIS jobs and discard old queued DIS evidence before model processing. Preserve
+existing memories for owner evaluation and conversation-based device preferences.
+No replacement adapter, aggregation metadata or historical telemetry is assigned.

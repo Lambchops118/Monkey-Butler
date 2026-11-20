@@ -301,15 +301,6 @@ def _maybe_record_call_memory(record: PhoneCallRecord) -> None:
             metadata={"type": "phone_call", "call_id": record.call_id},
         )
         memory_store.refresh_session_summary(target_session)
-        transcript_digest = _build_call_transcript_digest(record)
-        if transcript_digest:
-            memory_store.upsert_fact(
-                f"session:{target_session}",
-                f"phone_call_transcript:{record.call_id}",
-                transcript_digest,
-                salience=8,
-                source_session_id=target_session,
-            )
     except Exception as exc:
         print(f"Butler phone memory write failed: {exc}")
 

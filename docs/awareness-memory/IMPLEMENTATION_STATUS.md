@@ -1,3 +1,62 @@
+## Current bounded cleanup - remove DIS status memories (2026-11-19)
+
+Owner authorized deleting DIS status updates from LTMS. One transaction removed
+85 directly DIS-sourced memories and five individually reviewed conversational
+device-status entries, 10 incident edges via foreign-key cascade, and 70 queued
+DIS jobs. 18 memories remained at commit. Non-LTMS table row counts preserved
+inside the transaction; independent post-commit read verified zero DIS-sourced
+memories/jobs and zero foreign-key violations. No runtime restart or code change.
+Existing ingestion cutoff requires a restarted Butler to prevent an old process
+from admitting more DIS data. Stop at this data cleanup.
+
+## Current bounded change - DIS ingestion into LTMS disabled (2026-11-19)
+
+Owner defers device input until a future DIS status-package design. Removed DIS
+cache sampling; reject direct dis: submissions, discard queued DIS jobs on startup
+and before extraction. Existing memories/edges and conversation continuity remain.
+WCS ingestion remains. Fourteen LTMS tests passed; one existing main-runtime import
+check failed due to unavailable compiled pydantic_core dependency in the available
+interpreter environment. Compilation/whitespace passed; no live-model run or Butler
+restart. Restart Butler to apply this cutoff and clear its old DIS queue. Stop here;
+no status-package adapter or memory cleanup implemented.
+
+## Current bounded update - launcher information/memory controls (2026-11-19)
+
+Added direct Open memory graph (starts/reuses debug dashboard), Information & memory
+tab with DIS/WCS collection/context switches and LTMS enable/model/endpoint/GPU
+settings. Corrected legacy saved-fact labelling, documented unchanged history
+coupling, and kept clearing isolated. 32 launcher + 5 graph tests passed; compiled
+and whitespace checked. Started local dashboard and verified /memory through the
+launcher helper and browser (62 nodes, 11 edges at observation). Configured runtime
+Python312 is missing; used available compatible Python for this dashboard, with
+no runtime repair or Butler restart. Reopen launcher for widgets. Stop at this
+integration; no learning-policy, 3D or executor changes.
+
+## Current bounded addition - LTMS 2D viewer (2026-11-19)
+
+Implemented read-only `/memory` in the existing debug dashboard, with bounded
+query-only graph HTTP projection, directed labelled edges, pan/zoom/drag, search
+within loaded memories, selection/evidence and archived filtering. No migration,
+write path, new dependency, model call or LTMS behavior change. Five new graph tests
+and 17 dashboard tests passed; browser checked fixture edges and real DB (3 active
+nodes, 0 edges). Restart dashboard to load routes. Stop at viewer; no learning fixes,
+3D/VR or executor. See [LTMS.md](../LTMS.md) for limits and environment details.
+
+# Current bounded implementation - LTMS v1 (2026-11-19)
+
+Owner authorized simplified SQLite graph memory with per-turn asynchronous learning,
+small local-model organization/forgetting and semantic prompt recall. Migration 6
+adds LTMS-owned nodes, edges and durable pending jobs. Immediate conversation/tool
+history remains intact; legacy saved facts are neither imported nor retrieved.
+Dedicated Ollama process targets A2000; CPU all-minilm query embeddings; qwen3:8b
+extraction. Both models downloaded. No Butler deployment restart or physical action.
+
+115 deterministic checks passed across nine suites/subsets; one local-model
+learn/recall/change/forget acceptance passed. Full retirement catalog discovery
+stalled under socket restrictions and was terminated; its other four checks passed.
+See [LTMS.md](../LTMS.md) and the dated session log for exact counts, initial
+failures, limitations and deferred work. Stop at LTMS v1; no executor/reflection.
+
 # Implementation Status
 
 ## Current bounded fix - hourly upgrade inherited old polling schedule (2026-11-19)

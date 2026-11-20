@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest import mock
 
@@ -34,6 +35,37 @@ class _FakePopen:
 
 
 class LauncherDashboardTests(unittest.TestCase):
+    def test_memory_graph_starts_or_reuses_same_dashboard(self):
+        process = DashboardProcess(log=lambda *_: None)
+        response = mock.MagicMock()
+        response.__enter__.return_value.headers = {'Content-Type': 'text/html; charset=utf-8'}
+        with mock.patch.object(dashboard, '_port_open', return_value=True), \
+                mock.patch.object(dashboard.urllib.request, 'urlopen', return_value=response) as opened, \
+                mock.patch.object(dashboard.subprocess, 'Popen') as popen:
+            self.assertEqual(DASHBOARD_URL + '/memory', process.ensure_running('/memory'))
+            opened.assert_called_once_with(DASHBOARD_URL + '/memory', timeout=3)
+            popen.assert_not_called()
+
+    def test_old_running_dashboard_reports_missing_graph_without_killing_it(self):
+        process = DashboardProcess(log=lambda *_: None)
+        with mock.patch.object(dashboard, '_port_open', return_value=True), \
+                mock.patch.object(dashboard.urllib.request, 'urlopen', side_effect=urllib.error.HTTPError(DASHBOARD_URL+'/memory',404,'missing',{},None)), \
+                mock.patch.object(dashboard.subprocess, 'Popen') as popen:
+            with self.assertRaisesRegex(RuntimeError, 'Close its owning launcher'):
+                process.ensure_running('/memory')
+            popen.assert_not_called()
+
+    def test_memory_button_opens_requested_page_off_ui_thread(self):
+        from butler.launcher.gui import LauncherGUI
+        gui = LauncherGUI.__new__(LauncherGUI)
+        gui.dashboard = mock.Mock()
+        gui.dashboard.ensure_running.return_value = DASHBOARD_URL + '/memory'
+        gui.root = mock.Mock()
+        with mock.patch('webbrowser.open') as opened:
+            gui._open_dashboard_worker('/memory')
+        gui.dashboard.ensure_running.assert_called_once_with('/memory')
+        opened.assert_called_once_with(DASHBOARD_URL + '/memory')
+
     def test_reuses_a_console_that_is_already_listening(self) -> None:
         process = DashboardProcess(log=lambda *_: None)
         with mock.patch.object(dashboard, "_port_open", return_value=True), \

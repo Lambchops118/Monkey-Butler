@@ -13,6 +13,8 @@ import socket
 import subprocess
 import threading
 import time
+import urllib.request
+import urllib.error
 from typing import Callable, Optional
 
 from .config import REPO_ROOT, venv_python, venv_setup_hint
@@ -41,14 +43,16 @@ class DashboardProcess:
         self._popen: Optional[subprocess.Popen] = None
         self._lock = threading.Lock()
 
-    def ensure_running(self) -> str:
+    def ensure_running(self, path: str = '') -> str:
         """Return the console URL once it accepts connections.
 
         Raises ``RuntimeError`` with an operator-readable reason otherwise.
         """
+        if path not in ('', '/memory'):
+            raise ValueError('unsupported dashboard page')
         with self._lock:
             if _port_open(DASHBOARD_HOST, DASHBOARD_PORT):
-                return DASHBOARD_URL
+                return self._page_url(path)
             if self._popen is None or self._popen.poll() is not None:
                 self._popen = self._spawn()
             popen = self._popen
@@ -56,14 +60,29 @@ class DashboardProcess:
         while time.monotonic() < deadline:
             if popen.poll() is not None:
                 raise RuntimeError(
-                    f"debug console exited with code {popen.returncode}; see the Logs tab"
+                    f"debug console exited with code {popen.returncode}; see the Logs tab. "
+                    "Check that the configured runtime Python and its base installation still exist."
                 )
             if _port_open(DASHBOARD_HOST, DASHBOARD_PORT):
-                return DASHBOARD_URL
+                return self._page_url(path)
             time.sleep(0.2)
         raise RuntimeError(
             f"debug console did not open {DASHBOARD_URL} within {int(STARTUP_TIMEOUT_SECONDS)}s"
         )
+
+    @staticmethod
+    def _page_url(path: str) -> str:
+        url = DASHBOARD_URL + path
+        if path:
+            try:
+                with urllib.request.urlopen(url, timeout=3) as response:
+                    if 'text/html' not in response.headers.get('Content-Type', ''):
+                        raise RuntimeError('Unexpected service on the dashboard port.')
+            except urllib.error.HTTPError as exc:
+                raise RuntimeError('The running debug console lacks the Memory graph page. Close its owning launcher/console and reopen it to load the updated code.') from exc
+            except urllib.error.URLError as exc:
+                raise RuntimeError('The Memory graph page could not be reached; see the Logs tab.') from exc
+        return url
 
     def _spawn(self) -> subprocess.Popen:
         python = venv_python("main")
@@ -74,7 +93,7 @@ class DashboardProcess:
         self._log("dashboard", f"starting debug console: {' '.join(args)}")
         env = dict(os.environ)
         env["BUTLER_PROCESS_NAME"] = "dashboard"
-        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+        creationflags = (subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW) if os.name == "nt" else 0
         try:
             popen = subprocess.Popen(
                 args,
