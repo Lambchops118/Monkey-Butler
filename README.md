@@ -81,7 +81,9 @@ BUTLER is an entirely locally hosted, real-time, voice interaction based artific
 ### Hardware:
 - RTX 5080 or greater (mb-core-v1 and faster-whisper model)
 - Nvidia a2000 or greater (for LTMS)
-- Roomscale microphone and speaker with echo cancellation (for barge-in)
+- PoE capable router
+- ReSpeaker XVF3800 and JST speaker with echo cancellation (for barge-in)
+    - Ideally multiple if PoE setup is configured
 
 ### Software:
 - Windows or Ubuntu for deployment, basic development can happen on macOS.
