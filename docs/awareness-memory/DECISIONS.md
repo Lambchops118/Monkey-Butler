@@ -784,3 +784,12 @@ separately designed DIS status package. Do not poll DIS for LTMS. Reject direct
 DIS jobs and discard old queued DIS evidence before model processing. Preserve
 existing memories for owner evaluation and conversation-based device preferences.
 No replacement adapter, aggregation metadata or historical telemetry is assigned.
+
+
+## ADR-072 - Defer automatic WCS evidence into LTMS (2026-11-21)
+
+Owner stops automatic WCS observation/forecast ingestion just as for DIS. Reject
+raw observation sources and discard their queued pending/failed work; preserve
+existing memories and conversational learning. Eventual meaningful trend packages
+are a separate assignment, not a placeholder integration or telemetry-history
+expansion. No other memory policy, prompt or source-system behavior changes.

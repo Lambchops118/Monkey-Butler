@@ -1,5 +1,4 @@
 """Bounded local inference worker. No model work inside database transactions."""
-import hashlib
 import json
 import logging
 import os
@@ -97,32 +96,30 @@ class Service:
         self.server = None
         self.error = None
         self.dropped = 0
-        self.seen = {}
-        self.next_sources = 0
         self.next_embedding = 0
 
     def start(self):
-        self.discard_device_jobs()
+        self.discard_observation_jobs()
         self.thread = threading.Thread(target=self.run, name='ltms-memory', daemon=True)
         self.intake_thread = threading.Thread(target=self.intake, name='ltms-intake', daemon=True)
         self.intake_thread.start()
         self.thread.start()
 
-    def discard_device_jobs(self):
+    def discard_observation_jobs(self):
         with self.store.lock, self.store.db:
             rows = self.store.db.execute('SELECT id,payload FROM ltms_jobs').fetchall()
             for row in rows:
                 try:
-                    is_device = str(json.loads(row['payload']).get('source', '')).startswith('dis:')
+                    is_observation = str(json.loads(row['payload']).get('source', '')).startswith(('dis:', 'wcs:'))
                 except (ValueError, AttributeError):
                     continue
-                if is_device:
+                if is_observation:
                     self.store.db.execute('DELETE FROM ltms_jobs WHERE id=?', (row['id'],))
 
     def submit(self, payload, key=None):
         if not isinstance(payload, dict):
             raise ValueError('invalid evidence')
-        if str(payload.get('source', '')).startswith('dis:'):
+        if str(payload.get('source', '')).startswith(('dis:', 'wcs:')):
             return False
         encoded = json.dumps(payload)
         if len(encoded) > 16000:
@@ -168,21 +165,6 @@ class Service:
             lines.append('LTMS degraded: ' + self.error)
         return '\n'.join(lines)[:budget]
 
-    def observe_sources(self):
-        # DIS-to-LTMS status packages require a separately assigned contract.
-        # Do not sample device caches here, even for changes or errors.
-        from butler.wcs.service import read_context
-        samples = []
-        for observation in read_context().get('observations', []):
-            # Weather observations retain provider/receipt timestamps as evidence.
-            samples.append(('wcs:' + str(observation.get('subject')) + ':' + str(observation.get('kind')), observation))
-        for key, sample in samples:
-            identity = {k:v for k,v in sample.items() if k not in ('age_seconds', 'received_at', 'provenance')}
-            digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
-            if self.seen.get(key) != digest:
-                if self.submit(dict(source=key, observed_receipt=time.time(), data=sample)):
-                    self.seen[key] = digest
-
     def process_one(self):
         with self.store.lock:
             row = self.store.db.execute("SELECT * FROM ltms_jobs WHERE status='pending' AND next_attempt<=? ORDER BY created_at LIMIT 1", (time.time(),)).fetchone()
@@ -190,7 +172,7 @@ class Service:
             return False
         try:
             payload = json.loads(row['payload'])
-            if str(payload.get('source', '')).startswith('dis:'):
+            if str(payload.get('source', '')).startswith(('dis:', 'wcs:')):
                 with self.store.lock, self.store.db:
                     self.store.db.execute('DELETE FROM ltms_jobs WHERE id=?', (row['id'],))
                 return True
@@ -248,9 +230,6 @@ class Service:
         try:
             while not self.stop_event.is_set():
                 self.drain()
-                if time.monotonic() >= self.next_sources:
-                    self.observe_sources()
-                    self.next_sources = time.monotonic() + 5
                 self.stop_event.wait(.1)
             self.drain()
         except Exception:

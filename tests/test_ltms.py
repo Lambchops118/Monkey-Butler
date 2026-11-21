@@ -105,20 +105,20 @@ class LTMSTests(unittest.TestCase):
         client.list_tools.return_value=[]
         definitions=runtime._resource_tool_definitions()
         self.assertNotIn('memory_admin', [d.get('name') for d in definitions])
-    def test_source_age_changes_do_not_enqueue_duplicate_weather(self):
+    def test_wcs_input_rejected_but_conversational_weather_allowed(self):
+        service=Service(self.store,Model())
+        self.assertFalse(service.submit(dict(source='wcs:home:observation',data={'temperature':52})))
+        self.assertFalse(service.submit(dict(source='wcs:home:forecast',data={'high':70})))
+        self.assertEqual(0,service.inbox.qsize())
+        self.assertTrue(service.submit(dict(source='owner_message',user='I dislike hot weather')))
+
+    def test_intake_never_reads_dis_or_wcs_caches(self):
         from unittest.mock import patch
         service=Service(self.store,Model())
-        observation=dict(subject='home',kind='observation',values={'temp':40},age_seconds=1)
-        with patch('butler.dis.service.read_devices',return_value={}), patch('butler.wcs.service.read_context',return_value={'observations':[observation]}):
-            service.observe_sources()
-            observation['age_seconds']=10
-            service.observe_sources()
-        self.assertEqual(1,service.inbox.qsize())
-    def test_dis_cache_is_never_read_and_direct_device_input_rejected(self):
-        from unittest.mock import patch
-        service=Service(self.store,Model())
-        with patch('butler.dis.service.read_devices',side_effect=AssertionError('DIS must not be sampled')), patch('butler.wcs.service.read_context',return_value={}):
-            service.observe_sources()
+        with patch('butler.dis.service.read_devices',side_effect=AssertionError('DIS must not be sampled')) as dis_read, patch('butler.wcs.service.read_context',side_effect=AssertionError('WCS must not be sampled')) as wcs_read, patch.object(service.stop_event,'wait',side_effect=lambda _: service.stop_event.set()):
+            service.intake()
+        dis_read.assert_not_called()
+        wcs_read.assert_not_called()
         self.assertFalse(service.submit(dict(source='dis:lamp',data={'power':True})))
         self.assertEqual(0,service.inbox.qsize())
         self.assertTrue(service.submit(dict(source='owner_message',user='I prefer warm lighting')))
@@ -129,18 +129,23 @@ class LTMSTests(unittest.TestCase):
             self.store.db.executemany('INSERT INTO ltms_jobs(id,payload,status,created_at) VALUES(?,?,?,0)',[
                 ('old-dis',json.dumps({'source':'dis:lamp'}),'pending'),
                 ('failed-dis',json.dumps({'source':'dis:waterer'}),'failed'),
+                ('old-wcs',json.dumps({'source':'wcs:home:observation'}),'pending'),
+                ('failed-wcs',json.dumps({'source':'wcs:home:forecast'}),'failed'),
                 ('owner',json.dumps({'source':'owner_message','user':'I prefer lamps'}),'pending')])
         service=Service(self.store,Model())
-        service.discard_device_jobs()
+        service.discard_observation_jobs()
         self.assertEqual(['owner'],[r['id'] for r in self.store.db.execute('SELECT id FROM ltms_jobs')])
         self.assertEqual(memory_id,self.store.memories()[0]['id'])
 
-    def test_old_pending_device_job_never_reaches_model(self):
+    def test_old_pending_observation_jobs_never_reach_model(self):
         from unittest.mock import Mock
         model=Mock()
         with self.store.db:
-            self.store.db.execute('INSERT INTO ltms_jobs(id,payload,created_at) VALUES(?,?,0)',('old',json.dumps({'source':'dis:lamp'})))
+            self.store.db.executemany('INSERT INTO ltms_jobs(id,payload,created_at) VALUES(?,?,0)',[
+                ('old-dis',json.dumps({'source':'dis:lamp'})),
+                ('old-wcs',json.dumps({'source':'wcs:home:forecast'}))])
         service=Service(self.store,model)
+        self.assertTrue(service.process_one())
         self.assertTrue(service.process_one())
         model.extract.assert_not_called()
         self.assertEqual(0,self.store.db.execute('SELECT count(*) FROM ltms_jobs').fetchone()[0])

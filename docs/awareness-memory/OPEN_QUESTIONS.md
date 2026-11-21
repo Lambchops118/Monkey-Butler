@@ -274,3 +274,32 @@ an available compatible interpreter; main-runtime selection was not changed.
 Owner defers a DIS status package for meaningful long-term evidence. Content,
 provenance, aggregation and delivery contract remain unassigned. Direct device
 status sampling is disabled; do not add a placeholder adapter.
+
+
+## LTMS quality audit priorities (2026-11-20)
+
+Read-only audit confirms duplicate multiplication, transient conversational/WCS
+admission, source-evidence mismatch, poor no-match retrieval and exhausted model
+jobs. Decide a bounded repair scope before cleanup/expansion. Investigate new-
+evidence versus prior-memory separation, grounded consolidation, deterministic
+exact-duplicate handling, context deduplication/relevance and useful failure audit.
+No change was authorized by the evaluation request.
+
+
+## LTMS failure boundaries after controlled probes (2026-11-20)
+
+Model-size insufficiency is unproven. Current 8B misclassifies clean transient input
+and duplicates existing facts; clearer per-request examples improve small cases.
+Polluted reference graphs still cause copying. Application merge/archive/edge
+sequencing rejects useful proposed batches and merge provenance overwrites original
+evidence. Agree the new-evidence/consolidation contract and evidence-preservation
+semantics before repairs or a fair fixed-contract model comparison. Prior source
+mismatch findings must not be treated as proof of hallucination alone.
+
+
+## Future WCS-to-LTMS trend contract (2026-11-21)
+
+Owner wants eventual general trends such as a hot week, rather than individual
+weather reports. Evidence coverage, aggregation and delivery remain unassigned.
+WCS currently stores latest reports, so week-long history cannot be presumed.
+Automatic WCS input is disabled; no replacement implemented.

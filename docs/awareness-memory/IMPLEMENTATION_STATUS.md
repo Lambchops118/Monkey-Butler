@@ -1,3 +1,42 @@
+## Current bounded change - automatic WCS ingestion disabled (2026-11-21)
+
+Owner authorized the same cutoff as DIS, with no other behavior changes. Removed
+WCS sampling from LTMS; reject dis:/wcs: submissions and discard their queued jobs
+at startup/before extraction. Existing memories, conversation learning, prompt,
+WCS collection and retrieval are unchanged. Trend packages remain deferred.
+14 LTMS tests passed; one existing main-runtime import check remains blocked by
+pydantic_core environment mismatch. Compilation/whitespace passed. No production
+writes or restart. Restart Butler to apply. Stop at automatic WCS feed removal.
+
+## Current discovery - distinguish model/input/contract failures (2026-11-20)
+
+Owner requested discovery only. Seventeen local extraction probes (15 Qwen 8B,
+two existing mb-core-v1 14B comparisons) applied no results to production storage.
+Current Qwen prompt stores clean transient status and duplicates a known fact;
+clearer per-request examples fix those small cases. Full polluted reference graph
+still induces copying; compact unique references with the same clearer prompt
+produce correct no-op. Real-context replay generated merge+remove batches that
+application sequencing rejects. Independent in-memory checks prove rejection and
+prove valid merges replace provenance with unrelated triggering evidence. Thus
+source mismatch alone does not establish model hallucination. No evidence yet
+that model size alone is the limiting cause; stronger existing custom model also
+failed two small original-prompt probes. No runtime/config/model-template or DB
+changes. Stop at discovery, no repairs. See dated session log for limits/results.
+
+## Current bounded review - LTMS quality audit (2026-11-20)
+
+Read-only DB audit found 711 nodes: 214 active/497 archived. Active memories have
+54 normalized exact texts (160 redundant copies, ~75%); all 214 have 384-dimensional
+all-minilm embeddings. Of 199 edges, 60 connect active endpoints, leaving 162/214
+active nodes isolated. No foreign-key violations. No direct DIS-source memories.
+Transient status/weather, repeated interaction summaries and overconfident preference
+inferences dominate sampled/unique content. Attached evidence can contradict or fail
+to support a memory. At first snapshot 160 jobs had exhausted retries (85 ValueError,
+48 ReadTimeout, 27 JSONDecodeError); counts can change during live operation.
+Three read-only recall probes and an existing main-model log confirm duplicate/
+irrelevant context reaches recall. No memory, queue, runtime code or configuration
+changed; documentation only. See dated session log. Stop at evaluation; no repairs.
+
 ## Current bounded cleanup - remove DIS status memories (2026-11-19)
 
 Owner authorized deleting DIS status updates from LTMS. One transaction removed

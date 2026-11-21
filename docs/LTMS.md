@@ -27,9 +27,15 @@ Conversation learning still permits explicit owner preferences about devices;
 the worker prompt excludes routine device readings repeated in replies/results.
 This prompt policy is not a guarantee of semantic model compliance.
 
-WCS overview weather remains sampled every five seconds outside model turns,
-with observation/receipt/validity times preserved; age/receipt changes alone are
-ignored for deduplication. No new API calls or telemetry history adapter.
+Automatic WCS ingestion is also disabled as of 2026-11-21. LTMS no longer polls
+WCS caches. Direct `wcs:` submissions are rejected alongside `dis:` inputs. Startup
+discards pending/failed observation jobs for both systems; extraction also discards
+old queued observations before model invocation. Existing memories/edges and
+conversational learning are unchanged. Weather mentioned in conversation is still
+part of conversational evidence. No production cleanup or restart is automatic.
+Future bounded trend/status packages (for example, a supported weekly heat summary)
+remain unimplemented; WCS currently retains latest observations, not a week-long
+telemetry archive. This change adds no aggregation or replacement interface.
 
 ## Operations and limits
 
