@@ -32,6 +32,11 @@ RESOLUTIONS = {
 scale = 0.75
 FORCED_WINDOW_SIZE = RESOLUTIONS["1080P"]
 
+# Debug mode: show the mouse cursor plus a crosshair and label giving its
+# position in design units (the values PORTRAIT_BOX, dynamo configs etc. use)
+# and in window pixels.
+DEBUG_MOUSE = True
+
 # Every on-screen coordinate, size and font size in this module is authored in
 # this fixed design space. ``Layout`` maps it onto the real window with one
 # uniform scale factor (so circles stay round and text keeps its proportions)
@@ -60,6 +65,10 @@ class Layout:
 
     def length(self, d):
         return d * self.scale
+
+    def to_design(self, px, py):
+        """Inverse of ``point``: window pixels -> design units."""
+        return (px - self.offset_x) / self.scale, (py - self.offset_y) / self.scale
 
 
 def choose_window_size(display_w, display_h):
@@ -91,25 +100,75 @@ def get_font(size, ui_scale=scale):
 
 
 def platform_time_formats():
+    """strftime formats for (time, day, date), e.g. "6:34 PM", "Thursday",
+    "September 2, 2026". Windows spells "no leading zero" as %#, others as %-.
+    """
     if platform.system() == "Windows":
-        return "%A %#I:%M %p", "%B %#d, %Y"
-    return "%A %-I:%M %p", "%B %-d, %Y"
+        return "%#I:%M %p", "%A", "%B %#d, %Y"
+    return "%-I:%M %p", "%A", "%B %-d, %Y"
 
 
-def static_drawings(screen, layout):
+# ---- Clock (time / day / date) ------------------------------------------------
+# Design units. CLOCK_TOP_Y is the top of the first line's capitals, and
+# CLOCK_GAP the empty space between one line's baseline and the top of the next
+# line's capitals, so the lines look evenly spaced whatever their font sizes.
+# Horizontally the lines are centred between the portrait frame's right edge
+# and the vertical divider left of the dynamos (see clock_center_x); set
+# CLOCK_X to a design-unit x to pin them somewhere else instead.
+CLOCK_X     = None
+CLOCK_TOP_Y = 200  # level with the portrait frame top; was 162
+CLOCK_GAP   = 25
+
+_cap_metrics_cache = {}
+
+
+def _cap_metrics(font):
+    """(top, height) in pixels of capital letters/digits within a rendered line."""
+    key = id(font)
+    if key not in _cap_metrics_cache:
+        ink = font.render("H0", True, (255, 255, 255)).get_bounding_rect()
+        _cap_metrics_cache[key] = (ink.y, ink.height)
+    return _cap_metrics_cache[key]
+
+
+def draw_text_stack(screen, layout, lines, center_x, top_y, gap, color_):
+    """Draw ``(text, size)`` lines centred on ``center_x``, evenly spaced from
+    ``top_y`` downward. All arguments other than pixels are design units."""
+    px_x = layout.x(center_x)
+    cursor = layout.y(top_y)
+    for text, size in lines:
+        font = get_font(size, layout.scale)
+        cap_top, cap_h = _cap_metrics(font)
+        surf = font.render(str(text), True, color_)
+        # Centre the visible ink, not the glyph box (side bearings differ).
+        ink = surf.get_bounding_rect()
+        left = px_x - (ink.x + ink.width / 2)
+        screen.blit(surf, (round(left), round(cursor - cap_top)))
+        cursor += cap_h + layout.length(gap)
+
+
+def static_drawings(screen, layout, clock_x):
     base_w, base_h = layout.design_w, layout.design_h
-    time_format, date_format = platform_time_formats()
-    time_readable = time.strftime(time_format)
-    date_readable = time.strftime(date_format)
+    time_format, day_format, date_format = platform_time_formats()
+    time_readable = time.strftime(time_format)   # 6:34 PM
+    day_readable  = time.strftime(day_format)    # Thursday
+    date_readable = time.strftime(date_format)   # September 2, 2026
 
     def draw_text_centered(text, bx, by, color, size=30):
         surf = get_font(size, layout.scale).render(str(text), True, color)
         rect = surf.get_rect(center=layout.point(bx, by))
         screen.blit(surf, rect)
 
+    # Clock block: lines stacked top to bottom with an equal visible gap.
+    clock_lines = [
+        (time_readable, 150),
+        (day_readable,  125),
+        (date_readable,  90),
+    ]
+    draw_text_stack(screen, layout, clock_lines, clock_x, CLOCK_TOP_Y,
+                    CLOCK_GAP, color)
+
     items = [
-        #(time_readable,   base_w/2,     base_h/2.3, 75),
-        #(date_readable,   base_w/2,     base_h/2.1, 75),
         ("Monkey Butler", base_w/8.5,     base_h/14,  90),
         #("Information",   base_w/4,     base_h/14,  50),
         ("Systems Status",base_w/1.25,  base_h/14,  50),
@@ -180,6 +239,66 @@ def draw_portrait(surface, layout, color_, animation_time, *, bob=0.0,
         surface.set_clip(previous_clip)
 
 
+def draw_mouse_debug(surface, layout, color_=(255, 255, 255)):
+    """Crosshair at the mouse plus its design-unit and pixel coordinates."""
+    mx, my = pygame.mouse.get_pos()
+    dx, dy = layout.to_design(mx, my)
+    w, h = surface.get_size()
+    pygame.draw.line(surface, color_, (mx, 0), (mx, h), 1)
+    pygame.draw.line(surface, color_, (0, my), (w, my), 1)
+
+    font = get_font(40, layout.scale)
+    label = font.render(f"design ({dx:.0f}, {dy:.0f})  px ({mx}, {my})", True, color_)
+    rect = label.get_rect(topleft=(mx + 12, my + 12))
+    # Flip to the other side of the cursor near the right/bottom edges.
+    if rect.right > w:
+        rect.right = mx - 12
+    if rect.bottom > h:
+        rect.bottom = my - 12
+    pygame.draw.rect(surface, (0, 0, 0), rect.inflate(8, 4))
+    surface.blit(label, rect)
+
+
+# ---- Boundary lines -----------------------------------------------------------
+# Design units. HEADER_RULE_Y is the horizontal line under the titles, midway
+# between the bottom of "Monkey Butler"'s descenders (~144) and the portrait
+# frame top (170); it runs
+# from the portrait frame's left edge to the same margin on the right.
+# The vertical divider sits DIVIDER_GAP left of the leftmost dynamo's teeth and
+# runs from the header rule to the bottom of the portrait frame.
+HEADER_RULE_Y   = 0
+RULE_LINE_WIDTH = 5
+DIVIDER_GAP     = 25
+
+
+def dynamo_left_edge(dynamo_configs):
+    """Design x of the leftmost pixel of the leftmost dynamo."""
+    return min(cfg["x"] for cfg in dynamo_configs) - windows.Dynamo.left_extent()
+
+
+def divider_x(dynamo_configs):
+    """Design x of the vertical divider's centre line."""
+    return dynamo_left_edge(dynamo_configs) - DIVIDER_GAP - RULE_LINE_WIDTH / 2
+
+
+def clock_center_x(dynamo_configs, box=PORTRAIT_BOX):
+    """Design x midway between the portrait frame's right edge and the
+    vertical divider's left edge."""
+    frame_right = box["x"] + box["w"]
+    divider_left = divider_x(dynamo_configs) - RULE_LINE_WIDTH / 2
+    return (frame_right + divider_left) / 2
+
+
+def draw_boundaries(screen, layout, divider_center_x, box=PORTRAIT_BOX):
+    """Header rule under the titles and the divider left of the dynamos."""
+    lw = max(1, round(layout.length(RULE_LINE_WIDTH)))
+    left, right = box["x"], layout.design_w - box["x"]
+    pygame.draw.line(screen, color, layout.point(left, HEADER_RULE_Y), layout.point(right, HEADER_RULE_Y), lw)
+    pygame.draw.line(screen, color, layout.point(divider_center_x, HEADER_RULE_Y), layout.point(divider_center_x, box["y"]+200 + box["h"]), lw)
+
+    pygame.draw.line(screen, color, (0, 96), (1005, 96), lw)
+    pygame.draw.line(screen, color, (0, 711), (1005, 711), lw)
+
 def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd_queue' for new commands to display.
     # ``scale`` is accepted for compatibility but ignored: the UI scale is now
     # derived from the window size (see Layout).
@@ -223,7 +342,7 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         screen = pygame.display.set_mode((screen_width, screen_height), window_flags)
 
     pygame.display.set_caption("Monkey Butler")
-    pygame.mouse.set_visible(False)
+    pygame.mouse.set_visible(DEBUG_MOUSE)
 
     clock        = pygame.time.Clock()
     running      = True
@@ -277,6 +396,9 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         dict(id="engassist",x=1900, y=1150, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Engineering Assist", subtext="")
     ]
     
+    clock_x = CLOCK_X if CLOCK_X is not None else clock_center_x(dynamo_configs)
+    divider_center_x = divider_x(dynamo_configs)
+
     # This takes the dynamo configs and creates the actual Dynamo objects.
     dynamos = [
         windows.Dynamo(
@@ -416,7 +538,8 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
 
         # --- RENDER THE FRAME --- 
         framebuffer.fill((0, 1, 0)) 
-        static_drawings(framebuffer, layout)
+        static_drawings(framebuffer, layout, clock_x)
+        draw_boundaries(framebuffer, layout, divider_center_x)
         second = int(time.strftime("%S"))
         # Bob evenly above/below centre so the head stays centred on average.
         bob = PORTRAIT_BOB / 2 if second % 2 == 0 else -PORTRAIT_BOB / 2
@@ -483,6 +606,10 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         post.blit(grille_surf,   (0, 0))
         post.blit(vignette_surf, (0, 0))
         post.blit(scanlines_surf,(0, 0))
+
+        # Drawn after the post FX so bloom and scanlines don't smear the text.
+        if DEBUG_MOUSE:
+            draw_mouse_debug(post, layout)
 
         # Sleep mode: darken the finished frame to a few percent of its
         # brightness. Every layer -- text, dynamos, CRT masks -- dims together,

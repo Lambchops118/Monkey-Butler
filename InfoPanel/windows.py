@@ -101,6 +101,17 @@ class Widget:
 #class dynamo
 
 class Dynamo(Widget):
+    # Gear geometry in design units.
+    RADIUS = 75
+    BUMP   = 15
+    TOOTH_HALF_ANGLE_DEG = 12  # half-width of a tooth's outer edge
+
+    @classmethod
+    def left_extent(cls):
+        """Design units from a dynamo's centre to its leftmost pixel (the
+        outer corner of a tooth; varies by <1 unit as the gear turns)."""
+        return (cls.RADIUS + cls.BUMP) * math.cos(math.radians(cls.TOOTH_HALF_ANGLE_DEG))
+
     def __init__(self, config, supertext, subtext, system_status, degrees):
         super().__init__(config)
         self.supertext     = supertext
@@ -108,8 +119,8 @@ class Dynamo(Widget):
         self.system_status = system_status
 
         self.degrees = degrees
-        self.radius  = 75 * self.scale
-        self.bump    = 15 * self.scale
+        self.radius  = self.RADIUS * self.scale
+        self.bump    = self.BUMP * self.scale
         self.tooth_angle_offsets = [0, 45, 90, 135, 180, 225, 270, 315]
 
     def status_color(self):
@@ -128,7 +139,7 @@ class Dynamo(Widget):
     def compute_vertices(self, center_x, center_y, degrees):
         theta_base = math.radians(degrees)
         theta_15   = math.radians(15)
-        theta_12   = math.radians(12)
+        theta_12   = math.radians(self.TOOTH_HALF_ANGLE_DEG)
 
         angles_and_radii = [
             (theta_base - theta_15, self.radius),
