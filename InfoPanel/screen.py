@@ -35,7 +35,7 @@ FORCED_WINDOW_SIZE = RESOLUTIONS["1080P"]
 # Debug mode: show the mouse cursor plus a crosshair and label giving its
 # position in design units (the values PORTRAIT_BOX, dynamo configs etc. use)
 # and in window pixels.
-DEBUG_MOUSE = True
+DEBUG_MOUSE = False
 
 # Special effects. Everything is drawn the same way either way; these only
 # switch the finishing touches applied to the finished frame. ENABLE_FX is the
