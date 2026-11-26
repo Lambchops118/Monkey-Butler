@@ -120,22 +120,47 @@ def static_drawings(screen, layout):
         draw_text_centered(text, x, y, color, size)
 
 
-# Monkey Butler portrait anchor in design space, and its once-a-second bob.
-HEAD_X     = 800.0
-HEAD_Y     = 2020.0 / 3.0
-HEAD_BOB_Y = 40.0 / 3.0
+# ---- Portrait box -----------------------------------------------------------
+# Edit PORTRAIT_BOX to move or resize the box; the Monkey Butler head follows
+# it, stays centred inside it and scales with it. Values are design units.
+PORTRAIT_BOX = dict(x=1073, y=170, w=415, h=426)
+PORTRAIT_LINE_WIDTH = 8
+
+# How much of the box the head may fill (0..1), measured on whichever of the
+# box's width or height is the tighter fit. 385/415 is the original size.
+PORTRAIT_FILL = 385 / 415
+
+# Once-a-second bob, in design units at the original head size.
+PORTRAIT_BOB = 40.0 / 3.0
+
+# Bounding box of the head art in butler_vector_art's own units (y points up).
+_ART_X0, _ART_X1 = 290, 675
+_ART_Y0, _ART_Y1 = 190, 435
+_ART_CX = (_ART_X0 + _ART_X1) / 2
+_ART_CY = (_ART_Y0 + _ART_Y1) / 2
 
 
-def draw_portrait(surface, layout, design_x, design_y, color_, animation_time):
-    """Draw the portrait with its origin at a design-space point.
+def portrait_art_scale(box=None, fill=None):
+    """Design units per art unit so the head fits ``fill`` of ``box``."""
+    box = PORTRAIT_BOX if box is None else box
+    fill = PORTRAIT_FILL if fill is None else fill
+    return fill * min(box["w"] / (_ART_X1 - _ART_X0),
+                      box["h"] / (_ART_Y1 - _ART_Y0))
 
-    ``butler_vector_art`` places art at ``dx + ax*s - 200`` and
-    ``height - (dy + ay*s - 145)`` in pixels; solve for dx/dy so the art lands
-    at ``layout.point(design_x + ax, design_y - ay)`` at any resolution.
+
+def draw_portrait(surface, layout, color_, animation_time, *, bob=0.0,
+                  box=None, fill=None):
+    """Draw the head centred in ``box``, shifted up by ``bob`` (art units).
+
+    ``butler_vector_art`` places art point (ax, ay) at pixel
+    ``(dx + ax*s - 200, height - (dy + ay*s - 145))``. Solve for dx/dy so the
+    art's centre lands on the box centre at any resolution.
     """
-    s = layout.scale
-    dx = layout.x(design_x) + 200
-    dy = surface.get_height() - layout.y(design_y) + 145
+    box = PORTRAIT_BOX if box is None else box
+    s = layout.scale * portrait_art_scale(box, fill)
+    cx, cy = layout.point(box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
+    dx = cx - _ART_CX * s + 200
+    dy = surface.get_height() + 145 - cy - (_ART_CY + bob) * s
     draw_monkey_butler_head(surface, dx, dy, s, s, color_, animation_time)
 
 
@@ -301,7 +326,10 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         #     fontsize = 60),
         
         #Portrait Box
-        dict(x=1073, y=170, obj_width=415, obj_height=426, surface=framebuffer, scale=scale, color=color, text="", fontsize=0, line_width=8),
+        dict(x=PORTRAIT_BOX["x"], y=PORTRAIT_BOX["y"],
+             obj_width=PORTRAIT_BOX["w"], obj_height=PORTRAIT_BOX["h"],
+             surface=framebuffer, scale=scale, color=color, text="", fontsize=0,
+             line_width=PORTRAIT_LINE_WIDTH),
     ]
 
     # This takes the widget configs and creates the actual Widget objects.
@@ -374,9 +402,8 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         framebuffer.fill((0, 1, 0)) 
         static_drawings(framebuffer, layout)
         second = int(time.strftime("%S"))
-        bob = HEAD_BOB_Y if second % 2 == 0 else 0
-        mb_base_x = HEAD_X
-        mb_base_y = HEAD_Y - bob
+        # Bob evenly above/below centre so the head stays centred on average.
+        bob = PORTRAIT_BOB / 2 if second % 2 == 0 else -PORTRAIT_BOB / 2
 
         # Update Dynamo Statuses Here.
         dynamo_system_status["mqtt"]         = 1 #if (second >= 0) else 0  #placeholder code to simulate status changes. replace with actual
@@ -385,25 +412,13 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         dynamo_system_status["discord"]      = 1 #if (second >= 30) else 0
         dynamo_system_status["engassist"]    = 0 #if (second >= 40) else 0
 
-        debug = False
-        if debug:
-            draw_portrait(
-                framebuffer,
-                layout,
-                mb_base_x + 800 / 3,
-                mb_base_y - 200,
-                color,
-                time.monotonic() - portrait_started_at,
-            )
-        else:
-            draw_portrait(
-                framebuffer,
-                layout,
-                mb_base_x,
-                mb_base_y,
-                color,
-                time.monotonic() - portrait_started_at,
-            )
+        draw_portrait(
+            framebuffer,
+            layout,
+            color,
+            time.monotonic() - portrait_started_at,
+            bob=bob,
+        )
 
         #draw_text_topleft(f"Last command:  {last_command}",  75, 740, color, 36, target=framebuffer)
         #draw_text_topleft(f"Last response: {last_response}", 75, 900, color, 36, target=framebuffer)
