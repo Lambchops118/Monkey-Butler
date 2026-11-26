@@ -110,7 +110,7 @@ def static_drawings(screen, layout):
     items = [
         #(time_readable,   base_w/2,     base_h/2.3, 75),
         #(date_readable,   base_w/2,     base_h/2.1, 75),
-        ("Monkey Butler", base_w/2,     base_h/14,  80),
+        ("Monkey Butler", base_w/8.5,     base_h/14,  90),
         #("Information",   base_w/4,     base_h/14,  50),
         ("Systems Status",base_w/1.25,  base_h/14,  50),
         ("Chopscorp. Ltd. c 1977", base_w-180, base_h-75, 30),
@@ -120,17 +120,23 @@ def static_drawings(screen, layout):
         draw_text_centered(text, x, y, color, size)
 
 
-# ---- Portrait box -----------------------------------------------------------
-# Edit PORTRAIT_BOX to move or resize the box; the Monkey Butler head follows
-# it, stays centred inside it and scales with it. Values are design units.
-PORTRAIT_BOX = dict(x=1073, y=170, w=415, h=426)
+# ---- Portrait -----------------------------------------------------------------
+# The border and the Monkey Butler head are both driven by PORTRAIT_BOX, so
+# editing it moves and resizes them together. x/y is the box's top-left corner;
+# all values are design units (see Layout).
+#
+# w and h resize the frame independently. The head always keeps its aspect
+# ratio: its size follows the frame's height only, and it is clipped to the
+# frame's interior, so a frame narrower than the head eclipses its sides.
+#PORTRAIT_BOX = dict(x=1073, y=170, w=415, h=426)
+PORTRAIT_BOX = dict(x=75, y=170, w=1000, h=1100)
 PORTRAIT_LINE_WIDTH = 8
 
-# How much of the box the head may fill (0..1), measured on whichever of the
-# box's width or height is the tighter fit. 385/415 is the original size.
-PORTRAIT_FILL = 385 / 415
+# How much of the frame's height the head fills (0..1). 245/426 matches the
+# original head size in the original 415x426 frame.
+PORTRAIT_FILL = 245 / 426
 
-# Once-a-second bob, in design units at the original head size.
+# Once-a-second bob, in art units, so it scales with the head.
 PORTRAIT_BOB = 40.0 / 3.0
 
 # Bounding box of the head art in butler_vector_art's own units (y points up).
@@ -140,28 +146,38 @@ _ART_CX = (_ART_X0 + _ART_X1) / 2
 _ART_CY = (_ART_Y0 + _ART_Y1) / 2
 
 
-def portrait_art_scale(box=None, fill=None):
-    """Design units per art unit so the head fits ``fill`` of ``box``."""
-    box = PORTRAIT_BOX if box is None else box
-    fill = PORTRAIT_FILL if fill is None else fill
-    return fill * min(box["w"] / (_ART_X1 - _ART_X0),
-                      box["h"] / (_ART_Y1 - _ART_Y0))
+def portrait_art_scale(box=PORTRAIT_BOX, fill=PORTRAIT_FILL):
+    """Design units per art unit so the head fills ``fill`` of the box height."""
+    return fill * box["h"] / (_ART_Y1 - _ART_Y0)
+
+
+def portrait_clip_rect(layout, box=PORTRAIT_BOX, line_width=PORTRAIT_LINE_WIDTH):
+    """Pixel rect inside the frame's border, rounded the same way as Widget."""
+    lw = max(1, int(line_width * layout.scale))
+    outer = pygame.Rect(int(layout.x(box["x"])), int(layout.y(box["y"])),
+                        int(layout.length(box["w"])), int(layout.length(box["h"])))
+    return outer.inflate(-2 * lw, -2 * lw)
 
 
 def draw_portrait(surface, layout, color_, animation_time, *, bob=0.0,
-                  box=None, fill=None):
-    """Draw the head centred in ``box``, shifted up by ``bob`` (art units).
+                  box=PORTRAIT_BOX, fill=PORTRAIT_FILL):
+    """Draw the head centred in ``box``, raised by ``bob`` art units.
 
     ``butler_vector_art`` places art point (ax, ay) at pixel
     ``(dx + ax*s - 200, height - (dy + ay*s - 145))``. Solve for dx/dy so the
-    art's centre lands on the box centre at any resolution.
+    art's centre lands on the box centre at any resolution and box size.
+    Drawing is clipped to the frame's interior.
     """
-    box = PORTRAIT_BOX if box is None else box
     s = layout.scale * portrait_art_scale(box, fill)
     cx, cy = layout.point(box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
     dx = cx - _ART_CX * s + 200
     dy = surface.get_height() + 145 - cy - (_ART_CY + bob) * s
-    draw_monkey_butler_head(surface, dx, dy, s, s, color_, animation_time)
+    previous_clip = surface.get_clip()
+    surface.set_clip(portrait_clip_rect(layout, box).clip(previous_clip))
+    try:
+        draw_monkey_butler_head(surface, dx, dy, s, s, color_, animation_time)
+    finally:
+        surface.set_clip(previous_clip)
 
 
 def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd_queue' for new commands to display.
@@ -254,11 +270,11 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
 
 
     dynamo_configs = [
-        dict(id="mqtt", x=1700, y=250, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "MQTT Broker", subtext="[status]"),
-        dict(id="panels",x=1700, y=475, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Home Automation MCP", subtext="[status]"),
-        dict(id="waterer",x=1700, y=700, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Auto Waterer", subtext="[status]"),
-        dict(id="discord",x=1700, y=925,  base_deg=45,  surface=framebuffer, scale=scale, color=color, supertext= "Discord Frontend", subtext=""),
-        dict(id="engassist",x=1700, y=1150, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Engineering Assist", subtext="")
+        dict(id="mqtt", x=1900, y=250, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "MQTT Broker", subtext="[status]"),
+        dict(id="panels",x=1900, y=475, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Home Automation MCP", subtext="[status]"),
+        dict(id="waterer",x=1900, y=700, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Auto Waterer", subtext="[status]"),
+        dict(id="discord",x=1900, y=925,  base_deg=45,  surface=framebuffer, scale=scale, color=color, supertext= "Discord Frontend", subtext=""),
+        dict(id="engassist",x=1900, y=1150, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Engineering Assist", subtext="")
     ]
     
     # This takes the dynamo configs and creates the actual Dynamo objects.
