@@ -66,6 +66,10 @@ BUTLER is an entirely locally hosted, real-time, voice interaction based artific
 
 <ins><strong><a href="https://github.com/Lambchops118/Discord-Voice-Frontend">Discord Bot</a>:</strong></ins> Discord interface so BUTLER can be in discord and interacted with. Allows BUTLER to join a voice channel and speak with users. Also supports text based communication. All functions are available through discord as normal - communication input is flattened before it reaches the LLM.
 
+
+<ins><strong><a href="https://github.com/Lambchops118/Another-Personal-Finance-Tracker">Another Personal Finance Tracker</a>:</strong></ins> 
+I made this finance app entirely with claude using 0 brainpower. I did nothing and learned nothing. In fact, I actually made myself dumber working on this one. It keeps track of my finances and allows BUTLER to access them. Also tracks how much im spending on my girlfriend per month.
+
 ## ===Internal Subsystems===
 <u>**[World Context System (WCS)](docs/WCS.md):**</u> Handles state data for the environment. This includes things like weather, user location, what is going on in the room, what a user is doing.
 
