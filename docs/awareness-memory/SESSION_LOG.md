@@ -2621,3 +2621,35 @@ Current repository state: Committed on claude/busy-sagan-rzrezc.
 Next permitted task: Owner evaluation on real displays.
 Required reading: None.
 Explicit stop point: InfoPanel layout scaling only.
+
+
+## 2026-11-26 - InfoPanel portrait box centring and scaling
+
+Session goal: Centre the portrait in its box; make box and portrait movable/scalable.
+Current phase: Bounded display change.
+Bounded task completed: Added PORTRAIT_BOX, PORTRAIT_LINE_WIDTH, PORTRAIT_FILL,
+PORTRAIT_BOB and portrait_art_scale() in InfoPanel/screen.py. draw_portrait now
+centres the art bounding box on the box centre and scales with the box. Removed
+HEAD_X/HEAD_Y and the dead debug branch.
+Files added: None.
+Files modified: InfoPanel/screen.py, status and session log.
+Migrations added: None.
+Decisions made: Head size is a fill fraction of the tighter box dimension; bob is
++/- half the original amplitude around centre. Defaults resolve at call time so
+module-level overrides work.
+Assumptions confirmed or changed: Art bounds measured from butler_vector_art.py
+coordinates (x 290-675, y 190-435).
+Tests run/passed: Headless renders measured head centre vs box centre within 1px at
+1920x1080, 1280x720 and a moved/enlarged box; visual check.
+tests/test_infopanel_dim.py: 1 passed, 3 skipped.
+Tests failed: None.
+Commands not run: GPU CRT path; tests/test_display_boundary.py (openai missing).
+Known limitations: Portrait stroke width stays 1px; box border width scales with
+window only, not box size.
+Security implications: None.
+Deployment implications: Restart the display worker.
+Unresolved questions: None.
+Current repository state: Committed on claude/busy-sagan-rzrezc.
+Next permitted task: Owner evaluation; CRT crispness changes only if assigned.
+Required reading: None.
+Explicit stop point: Portrait box only.

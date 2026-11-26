@@ -1,3 +1,12 @@
+## Current bounded change - InfoPanel portrait box (2026-11-26)
+
+Owner asked for the portrait centred in its box and the box+portrait easy to move
+and scale. `PORTRAIT_BOX` (design units) in `InfoPanel/screen.py` now drives the
+box widget and the head: the head is centred in the box (bob is symmetric about
+centre) and scales with the box, sized by `PORTRAIT_FILL` (385/415 = original
+size). Head moved ~22 design units down versus before; otherwise unchanged.
+`butler_vector_art.py` untouched. Stop here.
+
 ## Current bounded fix - InfoPanel resolution-independent layout (2026-11-26)
 
 Owner asked for the pygame info panel to move and scale with resolution.
