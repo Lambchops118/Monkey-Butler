@@ -134,7 +134,11 @@ def add_bloom(base, strength=0.65, down=0.25):
     w, h    = base.get_size()
     small   = pygame.transform.smoothscale(base, (max(1, int(w * down)), max(1, int(h * down))))
     blurred = pygame.transform.smoothscale(small, (w, h))
-    blurred.set_alpha(int(255 * strength))
+    # Scale the glow's brightness by ``strength`` (0..1). set_alpha would be
+    # ignored here: pygame's BLEND_ADD does not apply per-surface alpha.
+    level = int(round(255 * min(max(float(strength), 0.0), 1.0)))
+    if level < 255:
+        blurred.fill((level, level, level), special_flags=pygame.BLEND_MULT)
     # Additive blend where supported; fallback: regular alpha
     #try:
     #    base.blit(blurred, (0, 0), special_flags=pygame.BLEND_ADD)

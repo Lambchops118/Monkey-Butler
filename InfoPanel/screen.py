@@ -37,6 +37,25 @@ FORCED_WINDOW_SIZE = RESOLUTIONS["1080P"]
 # and in window pixels.
 DEBUG_MOUSE = True
 
+# Special effects. Everything is drawn the same way either way; these only
+# switch the finishing touches applied to the finished frame. ENABLE_FX is the
+# master switch: when False, every effect below is off regardless of its own
+# setting, giving a flat, undistorted picture (handy with DEBUG_MOUSE, since
+# the cursor then lines up exactly with what is drawn).
+ENABLE_FX = True
+FX_CRT_SHADER = True  # OpenGL: screen curvature and gamma
+FX_BLOOM      = 0.25   # CPU: glow around bright lines and text, 0.0 (off) to 1.0 (full)
+FX_GRILLE     = True  # CPU: faint vertical aperture-grille stripes
+# These two each control BOTH versions of the effect: the CPU overlay and the
+# shader's own pass (when FX_CRT_SHADER is on).
+FX_VIGNETTE   = True  # darkened edges and corners
+FX_SCANLINES  = True  # horizontal scanlines
+
+
+def fx_on(flag):
+    """True when the master switch and the individual effect are both on."""
+    return ENABLE_FX and flag
+
 # Every on-screen coordinate, size and font size in this module is authored in
 # this fixed design space. ``Layout`` maps it onto the real window with one
 # uniform scale factor (so circles stay round and text keeps its proportions)
@@ -331,14 +350,20 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
 
     screen = None
     crt = None
-    try:
-        crt = GpuCRT(window_size=(screen_width, screen_height),
-               kx=0.18, ky=0.16, curv=0.3,
-               scan=0.18, vign=0.45, gamma=2.0,
-               extra_flags=window_flags)
-        print("GPU CRT effect enabled.")
-    except Exception as exc:
-        print(f"GPU CRT unavailable, falling back to standard Pygame rendering: {exc}")
+    if fx_on(FX_CRT_SHADER):
+        try:
+            crt = GpuCRT(window_size=(screen_width, screen_height),
+                   kx=0.18, ky=0.16, curv=0.3,
+                   scan=0.18 if fx_on(FX_SCANLINES) else 0.0,
+                   vign=0.45 if fx_on(FX_VIGNETTE) else 0.0,
+                   gamma=2.0,
+                   extra_flags=window_flags)
+            print("GPU CRT effect enabled.")
+        except Exception as exc:
+            print(f"GPU CRT unavailable, falling back to standard Pygame rendering: {exc}")
+    else:
+        print("GPU CRT shader disabled (ENABLE_FX / FX_CRT_SHADER).")
+    if crt is None:
         screen = pygame.display.set_mode((screen_width, screen_height), window_flags)
 
     pygame.display.set_caption("Monkey Butler")
@@ -601,11 +626,16 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         # === POST FX on a copy (so we can reuse framebuffer if needed) ===
         post = framebuffer#.copy()
         #last_frame = post
-        fx.add_bloom(post, strength=1, down=0.45)
+        bloom = min(max(float(FX_BLOOM), 0.0), 1.0) if ENABLE_FX else 0.0
+        if bloom > 0.0:
+            fx.add_bloom(post, strength=bloom, down=0.45)
         #post = fx.apply_persistence(last_frame, post, alpha=80)
-        post.blit(grille_surf,   (0, 0))
-        post.blit(vignette_surf, (0, 0))
-        post.blit(scanlines_surf,(0, 0))
+        if fx_on(FX_GRILLE):
+            post.blit(grille_surf,   (0, 0))
+        if fx_on(FX_VIGNETTE):
+            post.blit(vignette_surf, (0, 0))
+        if fx_on(FX_SCANLINES):
+            post.blit(scanlines_surf,(0, 0))
 
         # Drawn after the post FX so bloom and scanlines don't smear the text.
         if DEBUG_MOUSE:
