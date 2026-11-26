@@ -108,10 +108,10 @@ def static_drawings(screen, layout):
         screen.blit(surf, rect)
 
     items = [
-        (time_readable,   base_w/2,     base_h/2.3, 75),
-        (date_readable,   base_w/2,     base_h/2.1, 75),
+        #(time_readable,   base_w/2,     base_h/2.3, 75),
+        #(date_readable,   base_w/2,     base_h/2.1, 75),
         ("Monkey Butler", base_w/2,     base_h/14,  80),
-        ("Information",   base_w/4,     base_h/14,  50),
+        #("Information",   base_w/4,     base_h/14,  50),
         ("Systems Status",base_w/1.25,  base_h/14,  50),
         ("Chopscorp. Ltd. c 1977", base_w-180, base_h-75, 30),
     ]
@@ -278,27 +278,27 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
 
     widget_configs = [
         #Basic Information Box
-        dict(x=145, y=170, obj_width=850, obj_height=500, surface=framebuffer, scale=scale, color=color,
-             text=
-             "BTC: ${btc_price}  ETH: ${eth_price} SOL: ${sol_price} \n" \
-             "\n" \
-             "Temperature: {temp}°F   Feels Like: {feelslike}°F\n" \
-             "Humidity: {humidity}% \n" \
-             "Wind: {wind}mph  {wind_direction}\n Weather: {weather}\n" \
-             "\nUptime: {uptime} days | Net Worth: $101,749",
-             fontsize = 55),
+        #dict(x=145, y=170, obj_width=850, obj_height=500, surface=framebuffer, scale=scale, color=color,
+        #     text=
+        #     "BTC: ${btc_price}  ETH: ${eth_price} SOL: ${sol_price} \n" \
+        #     "\n" \
+        #     "Temperature: {temp}°F   Feels Like: {feelslike}°F\n" \
+        #     "Humidity: {humidity}% \n" \
+        #     "Wind: {wind}mph  {wind_direction}\n Weather: {weather}\n" \
+        #     "\nUptime: {uptime} days | Net Worth: $101,749",
+        #     fontsize = 55),
         
         #Voice Input Box
-        dict(x=60, y=735, obj_width=1500, obj_height=150, surface=framebuffer, scale=scale, color=color,
-             id="voice_cmd", 
-             text="\"Butler, water the Monstera...\"", 
-             fontsize = 60),
+        #dict(x=60, y=735, obj_width=1500, obj_height=150, surface=framebuffer, scale=scale, color=color,
+        #     id="voice_cmd", 
+        #     text="\"Butler, water the Monstera...\"", 
+        #     fontsize = 60),
 
         #Voice Response Box
-        dict(x=60, y=900, obj_width=1500, obj_height=450, surface=framebuffer, scale=scale, color=color, 
-             id="voice_resp",
-             text="Of course sir, the Monstera has been watered.", 
-             fontsize = 60),
+        #dict(x=60, y=900, obj_width=1500, obj_height=450, surface=framebuffer, scale=scale, color=color, 
+        #     id="voice_resp",
+        #     text="Of course sir, the Monstera has been watered.", 
+        #     fontsize = 60),
         
         #Portrait Box
         dict(x=1073, y=170, obj_width=415, obj_height=426, surface=framebuffer, scale=scale, color=color, text="", fontsize=0, line_width=8),
