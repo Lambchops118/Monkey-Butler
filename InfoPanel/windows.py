@@ -19,18 +19,21 @@ class WidgetConfig:
     text:       str
     line_width: int
     font_size:  int
+    # Pixel offset of the design-space origin in the window (letterboxing).
+    offset_x:   float = 0.0
+    offset_y:   float = 0.0
 
 class Widget:
     def __init__(self, config: WidgetConfig):
         self.surface     = config.surface
-        self.x           = int(config.x * config.scale)
-        self.y           = int(config.y * config.scale)
+        self.x           = int(config.offset_x + config.x * config.scale)
+        self.y           = int(config.offset_y + config.y * config.scale)
         self.obj_width   = int(config.obj_width * config.scale)
         self.obj_height  = int(config.obj_height * config.scale)
         self.scale       = config.scale
         self.color       = config.color
         self.font_size   = int(config.font_size * config.scale)
-        self.line_width  = int(config.line_width * config.scale)
+        self.line_width  = max(1, int(config.line_width * config.scale))
         self.text        = config.text
         self.x_centered  = self.x # - (0.5 * self.obj_width)
         self.y_centered  = self.y # - (0.5 * self.obj_height)
@@ -47,7 +50,7 @@ class Widget:
     def render_text_area(self, text: str, x: int, y: int, w: int, h: int, *, font_size=None, color=None):
         font_size = font_size or self.font_size
         color     = color or self.color
-        font      = pygame.font.Font(FONT_PATH, int(font_size))
+        font      = pygame.font.Font(FONT_PATH, max(1, int(font_size)))
 
         lines = []
         for paragraph in text.splitlines():
@@ -85,10 +88,11 @@ class Widget:
         # default behavior: render config.text inside the widget area
         if text is not None:
             self.text = text
+        padding = int(20 * self.scale)  # 20 design units (15px at 1080p)
         return self.render_text_area(
             text=self.text,
-            x = self.x + 15,
-            y = self.y + 15,
+            x = self.x + padding,
+            y = self.y + padding,
             w = self.obj_width,
             h = self.obj_height
         )

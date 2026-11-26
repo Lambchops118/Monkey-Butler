@@ -2587,3 +2587,37 @@ and documentation changed by this task.
 Next permitted task: Owner graph evaluation; separately assigned work only.
 Required reading: docs/LTMS.md and current implementation status.
 Explicit stop point: Remove existing device-status memory data; no other cleanup.
+
+
+## 2026-11-26 - InfoPanel resolution-independent layout
+
+Session goal: Make the InfoPanel pygame screen move/scale with window resolution.
+Current phase: Bounded display fix.
+Bounded task completed: Added a single design-space Layout (2560x1440, uniform
+scale, centred letterbox) in InfoPanel/screen.py; widgets/dynamos gain
+offset_x/offset_y in windows.WidgetConfig (default 0); fonts, text padding,
+wireframe panel rect and portrait anchor derive from the layout.
+Files added: None.
+Files modified: InfoPanel/screen.py, InfoPanel/windows.py, status and session log.
+Migrations added: None.
+Decisions made: Uniform scale with letterboxing instead of non-uniform stretch so
+gears stay round and text keeps proportions. run_info_panel_gui's scale argument
+is retained for compatibility but ignored; sys.argv base-resolution parsing removed
+(the worker's argv is not a resolution).
+Assumptions confirmed or changed: Existing coordinates were QHD design units
+scaled by a fixed 0.75 (i.e. tuned for 1080p).
+Tests run/passed: Headless dummy-driver renders: 1920x1080 before vs after
+pixel-identical; 1280x720, 3840x2160, 1920x1200 visually checked.
+tests/test_infopanel_dim.py: 1 passed, 3 skipped.
+Tests failed: tests/test_display_boundary.py not collectable here (openai not
+installed; same before the change).
+Commands not run: GPU CRT path on real hardware.
+Known limitations: Portrait strokes stay 1px wide at all resolutions; window size
+is still forced to 1080p unless BUTLER_DISPLAY_FULLSCREEN=1.
+Security implications: None.
+Deployment implications: Restart the display worker.
+Unresolved questions: None.
+Current repository state: Committed on claude/busy-sagan-rzrezc.
+Next permitted task: Owner evaluation on real displays.
+Required reading: None.
+Explicit stop point: InfoPanel layout scaling only.

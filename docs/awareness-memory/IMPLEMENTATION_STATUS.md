@@ -1,3 +1,12 @@
+## Current bounded fix - InfoPanel resolution-independent layout (2026-11-26)
+
+Owner asked for the pygame info panel to move and scale with resolution.
+`InfoPanel/screen.py` now authors all coordinates in one 2560x1440 design space
+mapped by a `Layout` (uniform scale = min(w/2560, h/1440), centred/letterboxed).
+Widgets and dynamos take the layout offset; fonts, text padding and the portrait
+anchor scale with it. The fixed 0.75 scale argument and argv base resolution are
+no longer used. 1920x1080 output verified pixel-identical to before. Stop here.
+
 ## Current bounded cleanup - remove DIS status memories (2026-11-19)
 
 Owner authorized deleting DIS status updates from LTMS. One transaction removed

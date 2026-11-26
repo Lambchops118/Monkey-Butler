@@ -32,22 +32,41 @@ RESOLUTIONS = {
 scale = 0.75
 FORCED_WINDOW_SIZE = RESOLUTIONS["1080P"]
 
+# Every on-screen coordinate, size and font size in this module is authored in
+# this fixed design space. ``Layout`` maps it onto the real window with one
+# uniform scale factor (so circles stay round and text keeps its proportions)
+# and centres the result, letterboxing when the aspect ratio is not 16:9.
+DESIGN_W, DESIGN_H = RESOLUTIONS["QHD"]
+
+
+class Layout:
+    """Maps design-space coordinates onto the actual window."""
+
+    def __init__(self, screen_w, screen_h, design_w=DESIGN_W, design_h=DESIGN_H):
+        self.design_w = design_w
+        self.design_h = design_h
+        self.scale = min(screen_w / design_w, screen_h / design_h)
+        self.offset_x = (screen_w - design_w * self.scale) / 2
+        self.offset_y = (screen_h - design_h * self.scale) / 2
+
+    def x(self, dx):
+        return self.offset_x + dx * self.scale
+
+    def y(self, dy):
+        return self.offset_y + dy * self.scale
+
+    def point(self, dx, dy):
+        return self.x(dx), self.y(dy)
+
+    def length(self, d):
+        return d * self.scale
+
 
 def choose_window_size(display_w, display_h):
     forced_w, forced_h = FORCED_WINDOW_SIZE
     window_w = min(forced_w, display_w)
     window_h = min(forced_h, display_h)
     return window_w, window_h
-
-def parse_base_resolution():
-    if len(sys.argv) < 2:
-        return RESOLUTIONS["QHD"]
-    arg = sys.argv[1].upper()
-    if arg in RESOLUTIONS:
-        return RESOLUTIONS[arg]
-    else:
-        print(f"Unknown resolution '{arg}'. Falling back to QHD.")
-        return RESOLUTIONS["QHD"]
 
 def draw_monkey_butler_head(
     screen, base_x, base_y, scale_x, scale_y, color_, animation_time=0.0
@@ -64,9 +83,8 @@ def draw_monkey_butler_head(
 
 _font_cache = {}
 
-def get_font(size, scale_x=1.0*scale, scale_y=1.0*scale):
-    avg_scale = (scale_x + scale_y) / 2
-    key = int(size * avg_scale)
+def get_font(size, ui_scale=scale):
+    key = max(1, int(size * ui_scale))
     if key not in _font_cache:
          _font_cache[key] = pygame.font.Font(font_path, key)
     return _font_cache[key]
@@ -78,14 +96,15 @@ def platform_time_formats():
     return "%A %-I:%M %p", "%B %-d, %Y"
 
 
-def static_drawings(screen, base_w, base_h, scale_x, scale_y, circle_time, scale):
+def static_drawings(screen, layout):
+    base_w, base_h = layout.design_w, layout.design_h
     time_format, date_format = platform_time_formats()
     time_readable = time.strftime(time_format)
     date_readable = time.strftime(date_format)
 
     def draw_text_centered(text, bx, by, color, size=30):
-        surf = get_font(size).render(str(text), True, color)
-        rect = surf.get_rect(center=(bx * scale_x, by * scale_y))
+        surf = get_font(size, layout.scale).render(str(text), True, color)
+        rect = surf.get_rect(center=layout.point(bx, by))
         screen.blit(surf, rect)
 
     items = [
@@ -101,7 +120,28 @@ def static_drawings(screen, base_w, base_h, scale_x, scale_y, circle_time, scale
         draw_text_centered(text, x, y, color, size)
 
 
-def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queue' for new commands to display.
+# Monkey Butler portrait anchor in design space, and its once-a-second bob.
+HEAD_X     = 800.0
+HEAD_Y     = 2020.0 / 3.0
+HEAD_BOB_Y = 40.0 / 3.0
+
+
+def draw_portrait(surface, layout, design_x, design_y, color_, animation_time):
+    """Draw the portrait with its origin at a design-space point.
+
+    ``butler_vector_art`` places art at ``dx + ax*s - 200`` and
+    ``height - (dy + ay*s - 145)`` in pixels; solve for dx/dy so the art lands
+    at ``layout.point(design_x + ax, design_y - ay)`` at any resolution.
+    """
+    s = layout.scale
+    dx = layout.x(design_x) + 200
+    dy = surface.get_height() - layout.y(design_y) + 145
+    draw_monkey_butler_head(surface, dx, dy, s, s, color_, animation_time)
+
+
+def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd_queue' for new commands to display.
+    # ``scale`` is accepted for compatibility but ignored: the UI scale is now
+    # derived from the window size (see Layout).
     print("Starting Pygame GUI for Info Panel...")
 
     pygame.init()
@@ -123,8 +163,9 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
     if (screen_width, screen_height) != FORCED_WINDOW_SIZE:
         print("Adjusted window size to fit the current display.")
 
-    base_w, base_h = parse_base_resolution()
-    print(f"Using base design resolution: {base_w}x{base_h}")
+    layout = Layout(screen_width, screen_height)
+    scale = layout.scale
+    print(f"Design resolution {DESIGN_W}x{DESIGN_H}, UI scale {scale:.3f}")
 
     mob_angle = 0
 
@@ -142,9 +183,6 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
 
     pygame.display.set_caption("Monkey Butler")
     pygame.mouse.set_visible(False)
-
-    scale_x = screen_width / base_w
-    scale_y = screen_height / base_h
 
     clock        = pygame.time.Clock()
     running      = True
@@ -174,7 +212,8 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
     #========================================================================================
 
     #Code for 3d wireframe panel
-    panel_rect = (screen_width - 900 , 300, 340, 260) # x, y, w, h
+    panel_rect = (int(layout.x(1360)), int(layout.y(400)),
+                  int(layout.length(453)), int(layout.length(347))) # x, y, w, h
     renderer   = vec3d.WireframeRenderer(panel_rect, fov=55, near=0.1, far=50) 
     mesh       = vec3d.cube_mesh(size=0.7) # Create a cube mesh
     angle      = 180.0 # Rotation angle for animation
@@ -210,7 +249,9 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
                 color=(255, 0, 0),
                 text="test text",
                 line_width=5,
-                font_size=(60)
+                font_size=(60),
+                offset_x=layout.offset_x,
+                offset_y=layout.offset_y,
             ),
             cfg["supertext"],
             cfg["subtext"],
@@ -276,7 +317,9 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
                 color=cfg["color"],
                 text=cfg["text"],
                 line_width=cfg.get("line_width", 5),
-                font_size=cfg["fontsize"]
+                font_size=cfg["fontsize"],
+                offset_x=layout.offset_x,
+                offset_y=layout.offset_y,
             )
         )
         for cfg in widget_configs
@@ -329,11 +372,11 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
 
         # --- RENDER THE FRAME --- 
         framebuffer.fill((0, 1, 0)) 
-        static_drawings(framebuffer, base_w, base_h, scale_x, scale_y, circle_time, scale)
+        static_drawings(framebuffer, layout)
         second = int(time.strftime("%S"))
-        dy = 10 if second % 2 == 0 else 0
-        mb_base_x = base_w / 3.2
-        mb_base_y = base_h / 2 + dy
+        bob = HEAD_BOB_Y if second % 2 == 0 else 0
+        mb_base_x = HEAD_X
+        mb_base_y = HEAD_Y - bob
 
         # Update Dynamo Statuses Here.
         dynamo_system_status["mqtt"]         = 1 #if (second >= 0) else 0  #placeholder code to simulate status changes. replace with actual
@@ -344,22 +387,20 @@ def run_info_panel_gui(cmd_queue, scale): #The main Pygame loop. Polls 'cmd_queu
 
         debug = False
         if debug:
-            draw_monkey_butler_head(
+            draw_portrait(
                 framebuffer,
-                mb_base_x + 200,
-                mb_base_y + 150,
-                scale_x,
-                scale_y,
+                layout,
+                mb_base_x + 800 / 3,
+                mb_base_y - 200,
                 color,
                 time.monotonic() - portrait_started_at,
             )
         else:
-            draw_monkey_butler_head(
+            draw_portrait(
                 framebuffer,
+                layout,
                 mb_base_x,
                 mb_base_y,
-                scale_x,
-                scale_y,
                 color,
                 time.monotonic() - portrait_started_at,
             )
