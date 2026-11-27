@@ -28,7 +28,7 @@ class WeatherReader:
         if self.units not in ('imperial', 'metric', 'standard') or len(self.location) > 160:
             raise ValueError('invalid weather configuration')
         self.identity = {'provider': 'openweather-3', 'location': self.location, 'units': self.units,
-                         'collection_version': 2}
+                         'collection_version': 3}
         self._coordinates = None
         self._get = get or requests.get
 
@@ -107,8 +107,16 @@ class WeatherReader:
                 'observation', observed, received, None, None, zone_name, values))
             try:
                 daily = self._request(existing.OPENWEATHER_ONECALL_URL,
-                    {**coords, 'units': self.units, 'exclude': 'current,minutely,alerts'})
+                    {**coords, 'units': self.units, 'exclude': 'minutely,alerts'})
                 received_daily = time.time()
+                current_uv = daily.get('current')
+                if isinstance(current_uv, dict) and current_uv.get('uvi') is not None:
+                    uv_values = {}
+                    add(uv_values, 'uv_index', current_uv['uvi'], None, 0, 100)
+                    uv_observed = number(current_uv['dt'], 1, received_daily + 300)
+                    observations.append(Observation(str(uuid4()), 'weather', self.location[:157] + ' UV',
+                        'openweather-onecall-current', 'observation', uv_observed,
+                        received_daily, None, None, zone_name, uv_values))
                 if isinstance(daily.get('timezone'), str):
                     try:
                         zone = ZoneInfo(daily['timezone'])

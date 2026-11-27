@@ -20,6 +20,8 @@ from butler.agent.conversation import resolve_session, voice_session_id
 from butler.config import env_bool, load_environment
 from butler.dis import service as dis_service
 from butler.wcs import service as wcs_service
+from butler.ltms import service as ltms_service
+from butler.display.projection import project as project_display
 from butler.wcs.models import ID as WCS_ID, unavailable as wcs_unavailable
 from butler.dis.models import ID_PATTERN, unavailable as dis_unavailable
 from butler.jobs import get_default_job_store
@@ -221,6 +223,7 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
                     "mcp": peek_local_mcp_status(),
                     "dis": dis_service.component_health(),
                     "wcs": wcs_service.component_health(),
+                    "ltms": ltms_service.component_health(),
                 },
             )
             return
@@ -338,6 +341,12 @@ class TextAgentRequestHandler(BaseHTTPRequestHandler):
         payload["ok"] = True
         payload["connected"] = True
         payload["sleep"] = sleep_mode.state()
+        try:
+            payload["information"] = project_display(wcs_service, dis_service, ltms_service)
+        except Exception:
+            payload["information"] = {"schema_version": 1, "weather": {}, "dynamos": {
+                "awareness": {"state": "error", "subtext": "ERR: status unavailable", "members": []},
+                "iot": {"state": "error", "subtext": "ERR: status unavailable", "members": []}}}
         self._write_json(HTTPStatus.OK, payload)
 
     def _handle_speak(self) -> None:

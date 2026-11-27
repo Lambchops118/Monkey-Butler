@@ -126,6 +126,8 @@ class Dynamo(Widget):
     def status_color(self):
         if self.system_status == 1:
             self.color = (0, 255, 100)
+        elif self.system_status == -1:
+            self.color = (255, 0, 0)
         else:
             self.color = (5, 5, 5)
         return self.color

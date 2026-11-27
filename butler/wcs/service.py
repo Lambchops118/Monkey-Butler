@@ -164,7 +164,10 @@ class WorldContextService:
             source_count += int(append_line({key: value for key, value in source.items()
                 if key not in {'last_attempt_at', 'poll_seconds', 'next_poll_at'}}))
         for observation in sorted(result['observations'], key=lambda o: o['kind'] == 'forecast'):
-            if observation['kind'] == 'observation':
+            if observation['source'] == 'openweather-onecall-current':
+                view = dict(current_uv=dict(observed_at=observation['observed_at'],
+                    values={'uv_index': observation['values'].get('uv_index')}))
+            elif observation['kind'] == 'observation':
                 view = dict(weather_observation=dict(subject=observation['subject'],
                     observed_at=observation['observed_at'], values={key: value for key, value in observation['values'].items()
                         if key in {'temperature', 'humidity', 'conditions'}}))

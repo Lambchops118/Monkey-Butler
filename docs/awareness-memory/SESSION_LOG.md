@@ -2653,3 +2653,71 @@ Current repository state: Committed on claude/busy-sagan-rzrezc.
 Next permitted task: Owner evaluation; CRT crispness changes only if assigned.
 Required reading: None.
 Explicit stop point: Portrait box only.
+## 2026-11-26 - InfoPanel data hookup inspection
+
+Session goal: Inspect immediate InfoPanel data hookups and backend gaps.
+Current phase: Bounded discovery only.
+Bounded task completed: Traced display snapshot, renderer, DIS, WCS, LTMS, MQTT, interaction and finance references; recorded findings in docs/INFOPANEL_DATA_INSPECTION.md.
+Files added: docs/INFOPANEL_DATA_INSPECTION.md.
+Files modified: docs/awareness-memory/IMPLEMENTATION_STATUS.md, docs/awareness-memory/SESSION_LOG.md.
+Migrations added: None.
+Decisions made: None; proposed contract remains subject to owner review.
+Assumptions confirmed or changed: Clock fields already use local time; finance is referenced as a separate project; visual states are hardcoded.
+Tests run: None (documentation-only inspection).
+Tests passed: None.
+Tests failed: None.
+Commands not run: Runtime tests, live endpoint probes, finance tracker inspection, deployment.
+Known limitations: No live service state was verified; finance API and accounting definitions are unknown.
+Security implications: Future display projection should use existing authenticated display route and avoid credentials/raw endpoints.
+Deployment implications: None.
+Unresolved questions: Finance contract and definitions; member lists and offline/error criteria; forecast wording and UV target.
+Current repository state: Documentation changes only; pre-existing untracked Peripherals/Pump-Power-Controller untouched.
+Next permitted task: Owner-reviewed bounded InfoPanel hookup assignment.
+Required reading for next session: docs/INFOPANEL_DATA_INSPECTION.md, docs/DIS.md, docs/WCS.md, docs/LTMS.md, docs/TOOL_IMPLEMENTATION_GUIDE.md if adding agent-facing tools.
+Explicit stop point: Inspection complete; no runtime hookup.
+
+## 2026-11-26 - InfoPanel WCS, DIS and LTMS hookups
+
+Session goal: Connect current outdoor temperature/conditions/UV, same-day hourly forecast, integrated IoT and awareness dynamo health.
+Current phase: Owner-authorized bounded InfoPanel implementation.
+Bounded task completed: Added read-only display projection, separate WCS current-UV observation, LTMS process health, and green/red/grey dynamo rendering with error subtext.
+Files added: butler/display/projection.py, tests/test_infopanel_projection.py.
+Files modified: InfoPanel/screen.py, InfoPanel/windows.py, butler/wcs/weather.py, butler/wcs/service.py, butler/ltms/service.py, butler/text/server.py, docs/WCS.md, implementation status and session log.
+Migrations added: None.
+Decisions made: Current UV remains a separate timestamped WCS observation; integrated DIS entries count for IoT health, inventory-only entries do not. Unassigned dynamos stay unavailable.
+Assumptions confirmed or changed: Existing One Call request can supply current UV without another endpoint request. Forecast condition changes can be selected from hourly observations.
+Tests run: Targeted unittest suite for display, WCS, DIS, LTMS and new projection; compilation and whitespace check.
+Tests passed: 83 targeted cases in `.venv-runtime` with loopback binding; one added LTMS health case passed separately afterward (3 projection cases total). Compilation and whitespace checks passed.
+Tests failed: Initial default-interpreter run lacked runtime dependencies; first runtime sandbox run could not bind loopback ports and had a new test import error. Fixed import and reran successfully outside sandbox.
+Commands not run: Live weather/device/model acceptance, display render smoke test, deployment restart, full repository suite.
+Known limitations: UV updates on WCS's scheduled poll, not continuously. Forecast text depends on available provider hourly descriptions. LTMS health is process/degraded state, not a synthetic end-to-end model request. Other dynamos have no backend hookup.
+Security implications: Display continues using authenticated snapshot; no new control or public endpoint.
+Deployment implications: Restart main Butler to load code and schedule the upgraded WCS collection; restart display client to load rendering changes.
+Unresolved questions: None blocking this bounded task.
+Current repository state: Changes above; pre-existing untracked Peripherals/Pump-Power-Controller untouched.
+Next permitted task: Separate owner-authorized hookup for remaining systems.
+Required reading for next session: docs/INFOPANEL_DATA_INSPECTION.md, docs/WCS.md, docs/DIS.md, docs/LTMS.md.
+Explicit stop point: WCS/DIS/LTMS InfoPanel hookup only.
+
+## 2026-11-26 - InfoPanel SVG graphics pipeline
+
+Session goal: Make future mouse-drawn SVG line art easy to place on the InfoPanel.
+Current phase: Owner-authorized bounded InfoPanel graphics implementation.
+Bounded task completed: Added offline SVG-to-JSON conversion, cached Pygame drawing, and named design-space placement list.
+Files added: InfoPanel/graphics/convert_svg.py, InfoPanel/graphics/README.md, InfoPanel/graphics_renderer.py, tests/test_infopanel_graphics.py.
+Files modified: InfoPanel/screen.py, docs/awareness-memory/IMPLEMENTATION_STATUS.md, docs/awareness-memory/SESSION_LOG.md.
+Migrations added: None.
+Decisions made: Editable SVG is source; JSON is committed runtime data. SVG parsing occurs only offline. Unsupported SVG elements and transforms fail conversion.
+Assumptions confirmed or changed: This pipeline is for future drawings; existing Butler portrait is unchanged. No new graphic was supplied for display.
+Tests run: Three focused unittest cases with .venv-main, .venv-runtime and default Python; py_compile; git diff --check.
+Tests passed: Three .venv-main cases; two cases and one Pygame skip in each of .venv-runtime and default Python; compilation and whitespace checks.
+Tests failed: Initial .venv and .venv-runtime module-name invocations could not import the test module; discovery ran successfully afterward.
+Commands not run: Full repository suite, live InfoPanel display, hardware or deployment checks.
+Known limitations: SVG subset supports straight lines and M/L/H/V/C/Q/Z paths; curves are sampled. Editor transforms must be flattened; fills and other SVG features are outside the supported workflow.
+Security implications: Graphic names are restricted to identifiers and only local JSON in the graphics directory is loaded.
+Deployment implications: Restart InfoPanel to pick up code or new graphic placements; run converter after SVG edits.
+Unresolved questions: None blocking this bounded task.
+Current repository state: Existing unrelated worktree changes preserved; new graphics files are untracked until committed.
+Next permitted task: Owner-assigned graphic placement or extension to the SVG subset.
+Required reading for next session: InfoPanel/graphics/README.md and InfoPanel/screen.py.
+Explicit stop point: General graphics pipeline only; no next drawing or portrait migration.

@@ -1,4 +1,14 @@
-## Current bounded change - InfoPanel portrait box (2026-11-26)
+## Current bounded change - InfoPanel SVG graphics pipeline (2026-11-26)
+
+Added an offline SVG-to-JSON converter under `InfoPanel/graphics/`, a reusable
+cached Pygame line renderer, and `GRAPHIC_PLACEMENTS` in the InfoPanel for
+named design-space placements. No graphic is enabled by default; the existing
+Butler portrait remains untouched. Converter supports a documented SVG line-art
+subset and rejects unsupported features. Three focused tests passed in
+`.venv-main`; compilation and whitespace checks passed. Stop at this
+pipeline; no artwork or new placement was assigned.
+
+## Previous bounded change - InfoPanel portrait box (2026-11-26)
 
 Owner asked for the portrait centred in its box and the box+portrait easy to move
 and scale. `PORTRAIT_BOX` (design units) in `InfoPanel/screen.py` now drives the
@@ -699,3 +709,19 @@ Expanded [PER_TURN_AWARENESS_2026-11-18.md](PER_TURN_AWARENESS_2026-11-18.md) wi
 ## Current consultation — awareness capability map (2026-11-18)
 
 Added [CAPABILITY_MAP_2026-11-18.md](CAPABILITY_MAP_2026-11-18.md): component responsibilities, external boundaries, concrete inputs, dependency chain, and implemented-versus-proven limitations. Documentation/source inspection only, no new tests/probes or runtime changes. Stop at overview; archiving/removal/replacement remains unassigned.
+## Current bounded inspection - InfoPanel data hookups (2026-11-26)
+
+Read-only interface inspection completed. The display has a polling snapshot boundary, while its new dynamo and finance/weather fields remain hardcoded. WCS and DIS offer cached structured data; finance is a separate project without a verified local contract. Interaction, broker and LTMS aggregate health need explicit contracts. See [InfoPanel data inspection](../INFOPANEL_DATA_INSPECTION.md). No runtime implementation or deployment occurred. Stop at owner review.
+
+## Current bounded implementation - InfoPanel WCS, DIS and LTMS (2026-11-26)
+
+Owner authorized cached WCS weather/current UV and forecast display, DIS IoT
+health, LTMS health, and green/red/grey dynamo rendering. The authenticated
+display snapshot now projects those read-only caches. WCS's existing One Call
+request retains current UV as separate timestamped evidence. Forecast text uses
+the first upcoming hourly condition change and its start time when available.
+Integrated DIS devices determine IoT health; inventory-only entries are excluded.
+Awareness aggregates DIS, WCS and LTMS component health. Unassigned interaction,
+MQTT and fabrication dynamos remain grey; finance placeholders show `--`.
+No controls, external finance integration or deployment restart occurred.
+Stop at this bounded InfoPanel hookup.

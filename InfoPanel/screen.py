@@ -5,6 +5,7 @@ import time
 import queue
 import pygame
 import platform
+from datetime import datetime
 from pathlib import Path
 from   dotenv import load_dotenv; load_dotenv()
 
@@ -14,6 +15,7 @@ from . import moving_vector_portrait as vec3d
 from . import obj_wireframe_loader as objl
 from . import screen_effects as fx
 from . import windows
+from .graphics_renderer import GraphicsRenderer
 from .screen_effects import GpuCRT
 
 font_path = str(Path(__file__).resolve().parent / "VT323-Regular.ttf")
@@ -34,6 +36,9 @@ FORCED_WINDOW_SIZE = RESOLUTIONS["1080P"]
 
 #draws cursor and crosshair with coordinates
 DEBUG_MOUSE = False
+
+# Add converted graphics here: (JSON filename without extension, design-space box).
+GRAPHIC_PLACEMENTS = []
 
 # SFX enable. Some are drawn with OpenGL some are rendered directly with CPU.
 ENABLE_FX = True
@@ -153,21 +158,30 @@ def draw_text_stack(screen, layout, lines, center_x, top_y, gap, color_):
         cursor += cap_h + layout.length(gap)
 
 
-def static_drawings(screen, layout, clock_x):
+def static_drawings(screen, layout, clock_x, information=None):
     base_w, base_h = layout.design_w, layout.design_h
     time_format, day_format, date_format = platform_time_formats()
     time_readable = time.strftime(time_format)   
     day_readable  = time.strftime(day_format)    
     date_readable = time.strftime(date_format) 
 
-    net_worth = "$113,000" 
-    saving    = "$798.67"
-    spent     = "$3563.89" 
+    net_worth = "--"
+    saving    = "--"
+    spent     = "--"
 
-    temp      = "31.4 F"
-    weather   = "Sunny"
-    forecast  = "Sleet, 4PM"
-    uv_index  = "4.5"
+    live = (information or {}).get('weather') or {}
+    temperature = live.get('temperature')
+    temp = f"{temperature['value']:g} {temperature['unit']}" if isinstance(temperature, dict) else "--"
+    weather = live.get('conditions') or "--"
+    forecast_data = live.get('forecast')
+    forecast = "--"
+    if isinstance(forecast_data, dict):
+        forecast = forecast_data['conditions']
+        if forecast_data.get('starts_at'):
+            at = datetime.fromisoformat(forecast_data['starts_at'])
+            forecast += ', ' + at.strftime('%I:%M %p').lstrip('0')
+    uv_data = live.get('uv_index')
+    uv_index = f"{uv_data['value']:g}" if isinstance(uv_data, dict) else "--"
 
     def draw_text_centered(text, bx, by, color, size=30):
         surf = get_font(size, layout.scale).render(str(text), True, color)
@@ -376,6 +390,7 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
     last_response = "of course, sir. i have activated the pump for the pot with the monstera."
     remote_sleep_state = {"asleep": False, "display_level": 1.0}
     portrait_started_at = time.monotonic()
+    graphics = GraphicsRenderer()
 
 
     #========================================================================================
@@ -401,12 +416,15 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
 
     # Add a new dict with settings to add new dynamos to the screen.
     dynamo_system_status = {
-        "mqtt": 1,
-        "panels": 1,
-        "waterer": 1,
-        "discord": 1,
-        "engassist": 1,
+        "mqtt": 0,
+        "panels": 0,
+        "waterer": 0,
+        "discord": 0,
+        "engassist": 0,
     }
+    dynamo_subtexts = {key: 'unavailable' for key in dynamo_system_status}
+    dynamo_subtexts['engassist'] = 'not implemented'
+    information = {}
 
 
     dynamo_configs = [
@@ -555,30 +573,36 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
                     if not snapshot.get("connected", True):
                         last_command = "Display disconnected from Butler"
                         last_response = str(snapshot.get("error", "Connection unavailable"))
+                        information = {}
+                        for widget_id in ('panels', 'waterer'):
+                            dynamo_system_status[widget_id] = 0
+                            dynamo_subtexts[widget_id] = 'unavailable'
                         continue
                     last_command = str(snapshot.get("last_command", last_command))
                     last_response = str(snapshot.get("last_response", last_response))
                     statuses = snapshot.get("statuses")
                     if isinstance(statuses, dict):
                         widget_statuses.update(statuses)
+                    information = snapshot.get('information') or {}
+                    for widget_id, source_id in (('panels', 'iot'), ('waterer', 'awareness')):
+                        group = (information.get('dynamos') or {}).get(source_id) or {}
+                        dynamo_system_status[widget_id] = {'online': 1, 'error': -1}.get(group.get('state'), 0)
+                        dynamo_subtexts[widget_id] = group.get('subtext') or 'unavailable'
                     sleep = snapshot.get("sleep")
                     if isinstance(sleep, dict):
                         remote_sleep_state = sleep
 
         # --- RENDER THE FRAME --- 
         framebuffer.fill((0, 1, 0)) 
-        static_drawings(framebuffer, layout, clock_x)
+        static_drawings(framebuffer, layout, clock_x, information)
         draw_boundaries(framebuffer, layout, divider_center_x)
+        for graphic_name, graphic_box in GRAPHIC_PLACEMENTS:
+            graphics.draw(framebuffer, layout, graphic_name, graphic_box, color)
         second = int(time.strftime("%S"))
         # Bob evenly above/below centre so the head stays centred on average.
         bob = PORTRAIT_BOB / 2 if second % 2 == 0 else -PORTRAIT_BOB / 2
 
         # Update Dynamo Statuses Here.
-        dynamo_system_status["mqtt"]         = 1 #if (second >= 0) else 0  #placeholder code to simulate status changes. replace with actual
-        dynamo_system_status["panels"]       = 1 #if (second >= 10) else 0
-        dynamo_system_status["waterer"]      = 1 #if (second >= 20) else 0
-        dynamo_system_status["discord"]      = 1 #if (second >= 30) else 0
-        dynamo_system_status["engassist"]    = 1 #if (second >= 40) else 0
 
         draw_portrait(
             framebuffer,
@@ -597,7 +621,7 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         # Draw Widgets to the screen
         for d, cfg in zip(dynamos, dynamo_configs):
             d.system_status = dynamo_system_status[cfg["id"]]
-            d.subtext = "online" if d.system_status == 1 else "offline"
+            d.subtext = dynamo_subtexts[cfg['id']]
             if d.system_status == 1:
                 d.degrees = (d.degrees + 4) % 360
             d.draw_dynamo()

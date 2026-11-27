@@ -319,3 +319,14 @@ def prompt_memory(query, budget=1600):
     except Exception:
         log.exception('LTMS retrieval unavailable')
         return 'LTMS unavailable; durable memories could not be retrieved.'
+
+
+def component_health():
+    service = _service
+    if service is None:
+        return {'status': 'unavailable', 'reason': 'not_running'}
+    if service.stop_event.is_set() or not service.thread or not service.thread.is_alive() or not service.intake_thread or not service.intake_thread.is_alive():
+        return {'status': 'unavailable', 'reason': 'worker_not_running'}
+    if service.error:
+        return {'status': 'degraded', 'reason': service.error}
+    return {'status': 'available', 'reason': None}

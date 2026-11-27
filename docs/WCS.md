@@ -5,6 +5,12 @@
 > 2,400 characters; see the hourly extension below. Earlier validation/incident
 > sections remain historical records.
 
+> InfoPanel update (2026-11-26): the existing One Call request now includes its
+> current UV index. WCS stores it as a separate current observation with its own
+> provider observation and receipt times. The collection-version change schedules
+> the upgraded source after restart while preserving prior observations. Display
+> reads remain cached; UV updates on WCS's normal 15-minute poll.
+
 Implemented 2026-11-19 following owner authorization. DIS v1 is considered done;
 WCS is a separate information-only module. Its only active source is configured
 local outdoor weather. No cameras, room sensors, presence, personal location,
