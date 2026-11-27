@@ -32,22 +32,16 @@ RESOLUTIONS = {
 scale = 0.75
 FORCED_WINDOW_SIZE = RESOLUTIONS["1080P"]
 
-# Debug mode: show the mouse cursor plus a crosshair and label giving its
-# position in design units (the values PORTRAIT_BOX, dynamo configs etc. use)
-# and in window pixels.
+#draws cursor and crosshair with coordinates
 DEBUG_MOUSE = False
 
-# Special effects. Everything is drawn the same way either way; these only
-# switch the finishing touches applied to the finished frame. ENABLE_FX is the
-# master switch: when False, every effect below is off regardless of its own
-# setting, giving a flat, undistorted picture (handy with DEBUG_MOUSE, since
-# the cursor then lines up exactly with what is drawn).
+# SFX enable. Some are drawn with OpenGL some are rendered directly with CPU.
 ENABLE_FX = True
-FX_CRT_SHADER = True  # OpenGL: screen curvature and gamma
+FX_CRT_SHADER = True   # OpenGL: screen curvature and gamma
 FX_BLOOM      = 0.25   # CPU: glow around bright lines and text, 0.0 (off) to 1.0 (full)
-FX_GRILLE     = True  # CPU: faint vertical aperture-grille stripes
-# These two each control BOTH versions of the effect: the CPU overlay and the
-# shader's own pass (when FX_CRT_SHADER is on).
+FX_GRILLE     = True   # CPU: faint vertical aperture-grille stripes
+
+#These two are handled by both GPU and OpenGl because of legacy code not getting phased out. The switches just control both at a time
 FX_VIGNETTE   = True  # darkened edges and corners
 FX_SCANLINES  = True  # horizontal scanlines
 
@@ -62,7 +56,7 @@ def fx_on(flag):
 # and centres the result, letterboxing when the aspect ratio is not 16:9.
 DESIGN_W, DESIGN_H = RESOLUTIONS["QHD"]
 
-
+# Had claude figure out the annoying scaling math
 class Layout:
     """Maps design-space coordinates onto the actual window."""
 
@@ -127,20 +121,13 @@ def platform_time_formats():
     return "%-I:%M %p", "%A", "%B %-d, %Y"
 
 
-# ---- Clock (time / day / date) ------------------------------------------------
-# Design units. CLOCK_TOP_Y is the top of the first line's capitals, and
-# CLOCK_GAP the empty space between one line's baseline and the top of the next
-# line's capitals, so the lines look evenly spaced whatever their font sizes.
-# Horizontally the lines are centred between the portrait frame's right edge
-# and the vertical divider left of the dynamos (see clock_center_x); set
-# CLOCK_X to a design-unit x to pin them somewhere else instead.
-CLOCK_X     = None
-CLOCK_TOP_Y = 200  # level with the portrait frame top; was 162
-CLOCK_GAP   = 25
+CLOCK_X     = None #manual X coord of text
+CLOCK_TOP_Y = 200  #Very top of rendered text
+CLOCK_GAP   = 25   #Space between rendered texts
 
 _cap_metrics_cache = {}
 
-
+#had claude figure out annoying text placement math
 def _cap_metrics(font):
     """(top, height) in pixels of capital letters/digits within a rendered line."""
     key = id(font)
@@ -169,9 +156,18 @@ def draw_text_stack(screen, layout, lines, center_x, top_y, gap, color_):
 def static_drawings(screen, layout, clock_x):
     base_w, base_h = layout.design_w, layout.design_h
     time_format, day_format, date_format = platform_time_formats()
-    time_readable = time.strftime(time_format)   # 6:34 PM
-    day_readable  = time.strftime(day_format)    # Thursday
-    date_readable = time.strftime(date_format)   # September 2, 2026
+    time_readable = time.strftime(time_format)   
+    day_readable  = time.strftime(day_format)    
+    date_readable = time.strftime(date_format) 
+
+    net_worth = "$113,000" 
+    saving    = "$798.67"
+    spent     = "$3563.89" 
+
+    temp      = "31.4 F"
+    weather   = "Sunny"
+    forecast  = "Sleet, 4PM"
+    uv_index  = "4.5"
 
     def draw_text_centered(text, bx, by, color, size=30):
         surf = get_font(size, layout.scale).render(str(text), True, color)
@@ -183,31 +179,37 @@ def static_drawings(screen, layout, clock_x):
         (time_readable, 150),
         (day_readable,  125),
         (date_readable,  90),
+        ("", 90),
+        ("Net Worth: " + net_worth, 90),
+        ("Surplus: " + saving, 90),
+        ("Spent: " + spent, 90),
+        ("", 90),
+        ("Temperature: " + temp, 80),
+        ("Weather: " + weather, 80),
+        ("Forecast: " + forecast, 80),
+        ("UV Index: " + uv_index, 80)
     ]
     draw_text_stack(screen, layout, clock_lines, clock_x, CLOCK_TOP_Y,
                     CLOCK_GAP, color)
 
+
     items = [
-        ("Monkey Butler", base_w/8.5,     base_h/14,  90),
+        #("Better Understanding Text to Speech Large Language Encoder Routine", base_w/3.05,     base_h/14,  65),
+        ("Monkey Butler", base_w/8.5,     base_h/14,  100),
+        ("v5.5", base_w/4.25, base_h/12, 35),
         #("Information",   base_w/4,     base_h/14,  50),
         ("Systems Status",base_w/1.25,  base_h/14,  50),
         ("Chopscorp. Ltd. c 1977", base_w-180, base_h-75, 30),
+        #("Net Worth: "+net_worth, clock_x, CLOCK_TOP_Y+CLOCK_GAP , 90)
     ]
 
     for text, x, y, size in items:
         draw_text_centered(text, x, y, color, size)
 
 
-# ---- Portrait -----------------------------------------------------------------
-# The border and the Monkey Butler head are both driven by PORTRAIT_BOX, so
-# editing it moves and resizes them together. x/y is the box's top-left corner;
-# all values are design units (see Layout).
-#
-# w and h resize the frame independently. The head always keeps its aspect
-# ratio: its size follows the frame's height only, and it is clipped to the
-# frame's interior, so a frame narrower than the head eclipses its sides.
+# entire portrait + frame now moves toegether. controlled by PORTRAIT_BOX. w/he resize frame independently, but butlers head is never stretched.
 #PORTRAIT_BOX = dict(x=1073, y=170, w=415, h=426)
-PORTRAIT_BOX = dict(x=75, y=170, w=1000, h=1100)
+PORTRAIT_BOX = dict(x=75, y=170, w=1000, h=1000)
 PORTRAIT_LINE_WIDTH = 8
 
 # How much of the frame's height the head fills (0..1). 245/426 matches the
@@ -278,13 +280,7 @@ def draw_mouse_debug(surface, layout, color_=(255, 255, 255)):
     surface.blit(label, rect)
 
 
-# ---- Boundary lines -----------------------------------------------------------
-# Design units. HEADER_RULE_Y is the horizontal line under the titles, midway
-# between the bottom of "Monkey Butler"'s descenders (~144) and the portrait
-# frame top (170); it runs
-# from the portrait frame's left edge to the same margin on the right.
-# The vertical divider sits DIVIDER_GAP left of the leftmost dynamo's teeth and
-# runs from the header rule to the bottom of the portrait frame.
+#vars for some boundary lines
 HEADER_RULE_Y   = 0
 RULE_LINE_WIDTH = 5
 DIVIDER_GAP     = 25
@@ -316,7 +312,7 @@ def draw_boundaries(screen, layout, divider_center_x, box=PORTRAIT_BOX):
     pygame.draw.line(screen, color, layout.point(divider_center_x, HEADER_RULE_Y), layout.point(divider_center_x, box["y"]+200 + box["h"]), lw)
 
     pygame.draw.line(screen, color, (0, 96), (1005, 96), lw)
-    pygame.draw.line(screen, color, (0, 711), (1005, 711), lw)
+    pygame.draw.line(screen, color, (0, 655), (1005, 655), lw)
 
 def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd_queue' for new commands to display.
     # ``scale`` is accepted for compatibility but ignored: the UI scale is now
@@ -408,19 +404,25 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         "mqtt": 1,
         "panels": 1,
         "waterer": 1,
-        "discord": 0,
+        "discord": 1,
         "engassist": 1,
     }
 
 
     dynamo_configs = [
-        dict(id="mqtt", x=1900, y=250, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "MQTT Broker", subtext="[status]"),
-        dict(id="panels",x=1900, y=475, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Home Automation MCP", subtext="[status]"),
-        dict(id="waterer",x=1900, y=700, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Auto Waterer", subtext="[status]"),
-        dict(id="discord",x=1900, y=925,  base_deg=45,  surface=framebuffer, scale=scale, color=color, supertext= "Discord Frontend", subtext=""),
-        dict(id="engassist",x=1900, y=1150, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Engineering Assist", subtext="")
+        dict(id="mqtt", x=1900, y=700, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "MQTT Broker", subtext="[status]"),
+        dict(id="panels",x=1900, y=925, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "IoT Nodes", subtext="[status]"),
+        dict(id="waterer",x=1900, y=475, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Awareness Subsystems", subtext="[status]"),
+        dict(id="discord",x=1900, y=250,  base_deg=45,  surface=framebuffer, scale=scale, color=color, supertext= "Interaction Nodes", subtext=""),
+        dict(id="engassist",x=1900, y=1150, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Fabrication Suite", subtext="")
     ]
-    
+
+        #dict(id="mqtt", x=1900, y=250, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "MQTT Broker", subtext="[status]"),
+        #dict(id="panels",x=1900, y=475, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "IoT Nodes", subtext="[status]"),
+        #dict(id="waterer",x=1900, y=700, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Awareness Subsystems", subtext="[status]"),
+        #dict(id="discord",x=1900, y=925,  base_deg=45,  surface=framebuffer, scale=scale, color=color, supertext= "Interaction Nodes", subtext=""),
+        #dict(id="engassist",x=1900, y=1150, base_deg=45, surface=framebuffer, scale=scale, color=color, supertext= "Fabrication Suite", subtext="")
+
     clock_x = CLOCK_X if CLOCK_X is not None else clock_center_x(dynamo_configs)
     divider_center_x = divider_x(dynamo_configs)
 
@@ -449,19 +451,21 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
         for cfg in dynamo_configs
     ]
 
+
+
     # Add new widget configs here to add new widgets to the screen.
 
     widget_statuses = {
-        "btc_price": None,
-        "eth_price": None,
-        "sol_price": None,
-        "temp"     : None,
-        "feelslike": None,
-        "humidity" : None,
-        "wind"     : None,
-        "wind_dir" : None,
-        "weather"  : None,
-        "uptime"     : None
+        "btc_price" : None,
+        "eth_price" : None,
+        "sol_price" : None,
+        "temp"      : None,
+        "feelslike" : None,
+        "humidity"  : None,
+        "wind"      : None,
+        "wind_dir"  : None,
+        "weather"   : None,
+        "uptime"    : None
     }
 
     widget_configs = [
@@ -571,10 +575,10 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
 
         # Update Dynamo Statuses Here.
         dynamo_system_status["mqtt"]         = 1 #if (second >= 0) else 0  #placeholder code to simulate status changes. replace with actual
-        dynamo_system_status["panels"]       = 0 #if (second >= 10) else 0
-        dynamo_system_status["waterer"]      = 0 #if (second >= 20) else 0
+        dynamo_system_status["panels"]       = 1 #if (second >= 10) else 0
+        dynamo_system_status["waterer"]      = 1 #if (second >= 20) else 0
         dynamo_system_status["discord"]      = 1 #if (second >= 30) else 0
-        dynamo_system_status["engassist"]    = 0 #if (second >= 40) else 0
+        dynamo_system_status["engassist"]    = 1 #if (second >= 40) else 0
 
         draw_portrait(
             framebuffer,
@@ -583,6 +587,9 @@ def run_info_panel_gui(cmd_queue, scale=None): #The main Pygame loop. Polls 'cmd
             time.monotonic() - portrait_started_at,
             bob=bob,
         )
+        for i in range(0, 9):
+            ycord = (110*i)+55
+            pygame.draw.circle(framebuffer, color, (ycord,715), 45, width=10)
 
         #draw_text_topleft(f"Last command:  {last_command}",  75, 740, color, 36, target=framebuffer)
         #draw_text_topleft(f"Last response: {last_response}", 75, 900, color, 36, target=framebuffer)
